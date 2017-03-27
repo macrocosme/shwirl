@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Usage &mdash; shwirl 0.1.1 documentation</title>
+  <title>Usage and snapshots &mdash; shwirl 0.1.1 documentation</title>
   
 
   
@@ -34,6 +34,7 @@
               href="genindex.html"/>
         <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="shwirl 0.1.1 documentation" href="index.html"/>
+        <link rel="next" title="Example data" href="Example.html"/>
         <link rel="prev" title="Installation" href="Installation.html"/> 
 
   
@@ -85,15 +86,22 @@
             
                 <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="About.html">About shwirl</a></li>
+<li class="toctree-l1"><a class="reference internal" href="About.html">About</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Installation.html">Installation</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Usage</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#shwirl-s-gui">shwirl&#8217;s GUI</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Usage and snapshots</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#graphical-user-interface-gui">Graphical User Interface (GUI)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#visualisation-and-colour-bar">Visualisation and colour bar</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#widgets">Widgets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cameras-and-transform">Cameras and transform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#colour">Colour</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#filter">Filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#smooth">Smooth</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#export">Export</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#metadata">Metadata</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#axis-labels">Axis labels</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="Example.html">Example data</a></li>
 </ul>
 
             
@@ -124,7 +132,7 @@
   <ul class="wy-breadcrumbs">
     <li><a href="index.html">Docs</a> &raquo;</li>
       
-    <li>Usage</li>
+    <li>Usage and snapshots</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -138,15 +146,17 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="usage">
-<h1>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="shwirl-s-gui">
-<h2>shwirl&#8217;s GUI<a class="headerlink" href="#shwirl-s-gui" title="Permalink to this headline">¶</a></h2>
-<img alt="_images/gui.png" src="_images/gui.png" />
+  <div class="section" id="usage-and-snapshots">
+<h1>Usage and snapshots<a class="headerlink" href="#usage-and-snapshots" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="graphical-user-interface-gui">
+<h2>Graphical User Interface (GUI)<a class="headerlink" href="#graphical-user-interface-gui" title="Permalink to this headline">¶</a></h2>
+<p>Upon start of the software, you will need to open a new spectral cube (currently supports FITS 3D image files only)
+using the GUI by clicking the <em>Load Spectral Cube</em> button at the top right corner.</p>
+<img alt="_images/1-load.png" src="_images/1-load.png" />
 </div>
 <div class="section" id="visualisation-and-colour-bar">
 <h2>Visualisation and colour bar<a class="headerlink" href="#visualisation-and-colour-bar" title="Permalink to this headline">¶</a></h2>
-<p>The 3D volume can be rotated, panned and zoomed using a mouse or a trackpad. To rotate the cube, simply click and move.
+<p>Once you have successfully loaded a spectral cube, the 3D volume can be rotated, panned and zoomed using a mouse or a trackpad. To rotate the cube, simply click and move.
 Panning can be achieved by click-n-move while pressing the <em>shift</em> key. Zooming in and out is achieved using the wheel,
 or using trackpad interactions like using two fingers (depending on device).</p>
 <p>The colour bar information is based on the FITS header and will vary depending on the colouring method.
@@ -154,41 +164,101 @@ If you find any oddities, please let me know.</p>
 </div>
 <div class="section" id="widgets">
 <h2>Widgets<a class="headerlink" href="#widgets" title="Permalink to this headline">¶</a></h2>
-<p>The widgets can be used to interact and modify the visualisation outcome. As it was primarily put together to experiment,
-widgets menu has the following look (image below). Future work should make it slightly more appealing!</p>
-<p>Usage is straight forward: <em>click, slide, select</em>. See what happens!</p>
-<p>Widgets include:</p>
+<p>The widgets can be used to interact and modify the visualisation outcome. Usage is straight forward: <em>click,
+slide, select</em>. See what happens!</p>
+</div>
+<div class="section" id="cameras-and-transform">
+<h2>Cameras and transform<a class="headerlink" href="#cameras-and-transform" title="Permalink to this headline">¶</a></h2>
+<p>You can set the field of view of the camera:</p>
+<img alt="_images/2-fov0.png" src="_images/2-fov0.png" />
+<img alt="_images/3-fov60.png" src="_images/3-fov60.png" />
+<p>You can scale axes (e.g. if the spectral axis does not have as many elements as the spatial axes):</p>
+<img alt="_images/4-stretch.png" src="_images/4-stretch.png" />
+<p>Other options include:</p>
 <blockquote>
 <div><ul class="simple">
-<li>Camera type (Basic VisPy cameras)</li>
-<li>Field of view</li>
-<li>Transfer function<ul>
+<li>Choice of different cameras (VisPy&#8217;s cameras)</li>
+</ul>
+<blockquote>
+<div><ul class="simple">
+<li>Turntable (Default)</li>
+<li>Argball</li>
+<li>Fly (using keyboard&#8217;s arrows)</li>
+</ul>
+</div></blockquote>
+<ul class="simple">
+<li>Autorotate</li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="colour">
+<h2>Colour<a class="headerlink" href="#colour" title="Permalink to this headline">¶</a></h2>
+<p><strong>Shwirl</strong> includes different transfer function and colouring methods.</p>
+<blockquote>
+<div><ul>
+<li><p class="first">Transfer function</p>
+<blockquote>
+<div><ul class="simple">
 <li>Maximum Intensity Projection (MIP)</li>
 <li>Local Maximum Intensity Projection (LMIP)</li>
 <li>Weighted Sum Projection (WSP)</li>
 <li>Iso surface</li>
 </ul>
+</div></blockquote>
 </li>
-<li>Colour method<ul>
+<li><p class="first">Colouring methods</p>
+</li>
+</ul>
+<blockquote>
+<div><ul class="simple">
 <li>Moment 0 (maps voxel intensity to colour)</li>
 <li>Moment 1 (maps velocity to colour and voxel intensity to transparency)</li>
 <li>RGB cube (maps voxel xyz position to rgb, and voxel intensity to transparency)</li>
 </ul>
-</li>
-<li>Interpolation method</li>
-<li>Scale axes (stretch)</li>
-<li>Smoothing filters<ul>
-<li>Box smoothing</li>
-<li>Gaussian smoothing</li>
-</ul>
-</li>
-<li>Filter<ul>
+</div></blockquote>
+</div></blockquote>
+<p>Example of WSP + Moment 0:</p>
+<img alt="_images/10-wsp-mom0.png" src="_images/10-wsp-mom0.png" />
+<p>Example of WSP + Moment 1:</p>
+<img alt="_images/11-wsp-mom1.png" src="_images/11-wsp-mom1.png" />
+<p>Example of WSP + RGB cube:</p>
+<img alt="_images/12-wsp-rgb.png" src="_images/12-wsp-rgb.png" />
+<img alt="_images/rgb_cube.png" src="_images/rgb_cube.png" />
+<p>MIP is used in the other examples.</p>
+</div>
+<div class="section" id="filter">
+<h2>Filter<a class="headerlink" href="#filter" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><ul class="simple">
 <li>Intensity clipping (Filter out)</li>
 <li>Intensity domain scaling (Rescale)</li>
 </ul>
-</li>
+</div></blockquote>
+<p>No Filter:</p>
+<img alt="_images/5-moment1.png" src="_images/5-moment1.png" />
+<p>Intensity clipping:</p>
+<img alt="_images/6-filter.png" src="_images/6-filter.png" />
+</div>
+<div class="section" id="smooth">
+<h2>Smooth<a class="headerlink" href="#smooth" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><ul class="simple">
+<li>Box smoothing</li>
+<li>Gaussian smoothing</li>
 </ul>
 </div></blockquote>
+<p>Intensity clipping + Gaussian smoothing</p>
+<img alt="_images/7-smooth.png" src="_images/7-smooth.png" />
+</div>
+<div class="section" id="export">
+<h2>Export<a class="headerlink" href="#export" title="Permalink to this headline">¶</a></h2>
+<p>The visualisation can be exported to an image:</p>
+<img alt="_images/8-export.png" src="_images/8-export.png" />
+</div>
+<div class="section" id="metadata">
+<h2>Metadata<a class="headerlink" href="#metadata" title="Permalink to this headline">¶</a></h2>
+<p>The information of the Primary Header is available in the metadata tab:</p>
+<img alt="_images/9-metadata.png" src="_images/9-metadata.png" />
 </div>
 <div class="section" id="axis-labels">
 <h2>Axis labels<a class="headerlink" href="#axis-labels" title="Permalink to this headline">¶</a></h2>
@@ -202,6 +272,8 @@ widgets menu has the following look (image below). Future work should make it sl
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="Example.html" class="btn btn-neutral float-right" title="Example data" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="Installation.html" class="btn btn-neutral" title="Installation" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>

@@ -1,57 +1,125 @@
-Usage
-=====
+Usage and snapshots
+===================
 
-shwirl's GUI
--------------
+Graphical User Interface (GUI)
+------------------------------
 
-.. image:: _static/gui.png
+Upon start of the software, you will need to open a new spectral cube (currently supports FITS 3D image files only)
+using the GUI by clicking the *Load Spectral Cube* button at the top right corner.
+
+.. image:: _static/1-load.png
 
 
 Visualisation and colour bar
 ----------------------------
-The 3D volume can be rotated, panned and zoomed using a mouse or a trackpad. To rotate the cube, simply click and move.
+Once you have successfully loaded a spectral cube, the 3D volume can be rotated, panned and zoomed using a mouse or a trackpad. To rotate the cube, simply click and move.
 Panning can be achieved by click-n-move while pressing the *shift* key. Zooming in and out is achieved using the wheel,
 or using trackpad interactions like using two fingers (depending on device).
 
 The colour bar information is based on the FITS header and will vary depending on the colouring method.
 If you find any oddities, please let me know.
 
-
 Widgets
 -------
-The widgets can be used to interact and modify the visualisation outcome. As it was primarily put together to experiment,
-widgets menu has the following look (image below). Future work should make it slightly more appealing!
+The widgets can be used to interact and modify the visualisation outcome. Usage is straight forward: *click,
+slide, select*. See what happens!
 
-Usage is straight forward: *click, slide, select*. See what happens!
 
-Widgets include:
+Cameras and transform
+---------------------
+You can set the field of view of the camera:
 
-   * Camera type (Basic VisPy cameras)
-   * Field of view
-   * Transfer function
+.. image:: _static/2-fov0.png
 
-     - Maximum Intensity Projection (MIP)
-     - Local Maximum Intensity Projection (LMIP)
-     - Weighted Sum Projection (WSP)
-     - Iso surface
+.. image:: _static/3-fov60.png
 
-   * Colour method
+You can scale axes (e.g. if the spectral axis does not have as many elements as the spatial axes):
+
+.. image:: _static/4-stretch.png
+
+Other options include:
+
+   * Choice of different cameras (VisPy's cameras)
+
+    - Turntable (Default)
+    - Argball
+    - Fly (using keyboard's arrows)
+
+   * Autorotate
+
+Colour
+------
+
+**Shwirl** includes different transfer function and colouring methods.
+
+    * Transfer function
+
+         - Maximum Intensity Projection (MIP)
+         - Local Maximum Intensity Projection (LMIP)
+         - Weighted Sum Projection (WSP)
+         - Iso surface
+
+    * Colouring methods
 
      - Moment 0 (maps voxel intensity to colour)
      - Moment 1 (maps velocity to colour and voxel intensity to transparency)
      - RGB cube (maps voxel xyz position to rgb, and voxel intensity to transparency)
 
-   * Interpolation method
-   * Scale axes (stretch)
-   * Smoothing filters
+Example of WSP + Moment 0:
+
+.. image:: _static/10-wsp-mom0.png
+
+Example of WSP + Moment 1:
+
+.. image:: _static/11-wsp-mom1.png
+
+Example of WSP + RGB cube:
+
+.. image:: _static/12-wsp-rgb.png
+
+.. image:: _static/rgb_cube.png
+
+MIP is used in the other examples.
+
+Filter
+------
+
+     - Intensity clipping (Filter out)
+     - Intensity domain scaling (Rescale)
+
+No Filter:
+
+.. image:: _static/5-moment1.png
+
+Intensity clipping:
+
+.. image:: _static/6-filter.png
+
+Smooth
+------
 
      - Box smoothing
      - Gaussian smoothing
 
-   * Filter
+Intensity clipping + Gaussian smoothing
 
-     - Intensity clipping (Filter out)
-     - Intensity domain scaling (Rescale)
+.. image:: _static/7-smooth.png
+
+
+Export
+------
+
+The visualisation can be exported to an image:
+
+.. image:: _static/8-export.png
+
+Metadata
+--------
+
+The information of the Primary Header is available in the metadata tab:
+
+.. image:: _static/9-metadata.png
+
 
 Axis labels
 -----------

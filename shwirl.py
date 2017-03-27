@@ -1237,7 +1237,7 @@ class Canvas3D(scene.SceneCanvas):
 
     def set_camera(self, cam, fov):
         if cam == 'Perspectivecamera':
-            self.view.camera = scene.cameras.Perspectivecamera(parent=self.view.scene,
+            self.view.camera = scene.cameras.PerspectiveCamera(parent=self.view.scene,
                                                                fov=float(fov),
                                                                name='Perspectivecamera',
                                                                center=(0.5, 0.5, 0.5))
@@ -1248,11 +1248,11 @@ class Canvas3D(scene.SceneCanvas):
                                                              fov=float(fov),
                                                              name='Turntable')
         if cam == 'Fly':
-            self.view.camera = scene.cameras.Flycamera(parent=self.view.scene,
+            self.view.camera = scene.cameras.FlyCamera(parent=self.view.scene,
                                                        fov=float(fov),
                                                        name='Fly')
         if cam == 'Arcball':
-            self.view.camera = scene.cameras.Arcballcamera(parent=self.view.scene,
+            self.view.camera = scene.cameras.ArcballCamera(parent=self.view.scene,
                                                            fov=float(fov),
                                                            name='Arcball')
 

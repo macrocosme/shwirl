@@ -1,7 +1,7 @@
-About shwirl
-=============
+About
+=====
 
-**shwirl** is a custom standalone Python program to visualise spectral data cubes with ray-tracing volume rendering.
+**Shwirl** is a custom standalone Python program to visualise spectral data cubes with ray-tracing volume rendering.
 The program has been developed to investigate transfer functions and graphics shaders as enablers for
 scientific visualisation of astronomical data. Details about transfer functions and shaders developed and implemented in
 **shwirl** can be found in a full length article by Vohl, Fluke, Barnes & Hassan (Submitted).
