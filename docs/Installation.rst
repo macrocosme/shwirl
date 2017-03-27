@@ -41,9 +41,7 @@ Once everything is installed/downloaded, you should be able to start **shwirl**'
 
 Python 2.7 / PyQt4 users
 ------------------------
-A PyQt4 version of **shwirl** is available in the `pyqt4 <https://github.com/macrocosme/shwirl/tree/pyqt4>`_
-branch on GitHub. This version is not currently being actively developed and does not contain all the latest development.
-I may include both into a single package in the future if there is interest.
+PyQt4 (and Python 2.7) are also supported.
 
 
 

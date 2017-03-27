@@ -15,18 +15,38 @@ from shades import RenderVolume
 from astropy.io import fits
 
 # PyQt5 imports
-from PyQt5 import QtGui, QtCore, QtWidgets
+try:
+    from PyQt5 import QtGui, QtCore, QtWidgets
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtGui import QColor, QPixmap
+    from PyQt5.QtCore import Qt, pyqtSignal
+except:
+    try:
+        try:
+            from sip import setapi
 
-class MainWindow(QtWidgets.QMainWindow):
+            setapi("QVariant", 2)
+            setapi("QString", 2)
+        except ImportError:
+            pass
+
+        from PyQt4 import QtGui, QtCore
+        from PyQt4.QtCore import Qt
+        from PyQt4.QtGui import *
+    except:
+        print ("Requires PyQt5 or PyQt4. None found.")
+        exit()
+
+class MainWindow(QMainWindow):
     def __init__(self, resolution):
-        QtWidgets.QMainWindow.__init__(self)
+        QMainWindow.__init__(self)
 
         # self.resize(1800, 1000)
         self.resize(resolution.width(), resolution.height())
         self.setWindowTitle('Shwirl')
 
-        splitter_h = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        splitter_v = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        splitter_h = QSplitter(Qt.Horizontal)
+        splitter_v = QSplitter(Qt.Vertical)
 
         self.Canvas3D = Canvas3D(resolution)
         self.Canvas3D.create_native()
@@ -52,7 +72,7 @@ class MainWindow(QtWidgets.QMainWindow):
                                   'image': 'Export'}
 
         self.props = {}
-        toolbox = QtWidgets.QToolBox()
+        toolbox = QToolBox()
         for type in self.widget_types:
             self.props[type] = ObjectWidget(type)
             toolbox.addItem(self.props[type], self.widget_types_text[type])
@@ -90,7 +110,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.props['filtering'].signal_low_discard_filter_changed.connect(self.update_low_discard_filter)
         self.props['image'].signal_export_image.connect(self.export_image)
 
-        QtWidgets.QApplication.setStyle(QtWidgets.QStyleFactory.create('Cleanlooks'))
+        QApplication.setStyle(QStyleFactory.create('Cleanlooks'))
+
+    def keyPressEvent(self, e):
+        if e.key() == QtCore.Qt.Key_Escape:
+            self.app.quit()
 
     def load_volume(self):
         self.Canvas3D.set_volume_scene(self.props['load_button'].loaded_cube)
@@ -163,7 +187,7 @@ class MainWindow(QtWidgets.QMainWindow):
                                              self.props['filtering'].combo_filter_type.currentText())
 
     def export_image(self):
-        fileName = QtWidgets.QFileDialog.getSaveFileName(self,
+        fileName = QFileDialog.getSaveFileName(self,
                                                          'Save still image',
                                                          filter='Images (*.png)')
         if fileName[0] != '':
@@ -171,31 +195,31 @@ class MainWindow(QtWidgets.QMainWindow):
             io.write_png(fileName[0], img)
 
 
-class FitsMetaWidget(QtWidgets.QWidget):
+class FitsMetaWidget(QWidget):
     """
     Widget for editing Volume parameters
     """
 
-    # signal_objet_changed = QtCore.pyqtSignal(name='objectChanged')
+    # signal_objet_changed = pyqtSignal(name='objectChanged')
 
     def __init__(self, parent=None):
         super(FitsMetaWidget, self).__init__(parent)
 
-        l_title = QtWidgets.QLabel("Fits Primary Header")
+        l_title = QLabel("Fits Primary Header")
 
-        self.l_header = QtWidgets.QTextEdit("No fits loaded ")
+        self.l_header = QTextEdit("No fits loaded ")
         self.l_header.setReadOnly(True)
 
         font = self.l_header.font()
         font.setFamily("Avenir")
         font.setPointSize(12)
 
-        gbox = QtWidgets.QGridLayout()
+        gbox = QGridLayout()
         # ------ Adding Widgets
         gbox.addWidget(l_title, 0, 1)
         gbox.addWidget(self.l_header, 1, 1)
 
-        vbox = QtWidgets.QVBoxLayout()
+        vbox = QVBoxLayout()
         vbox.addLayout(gbox)
         vbox.addStretch(1.0)
 
@@ -205,36 +229,36 @@ class FitsMetaWidget(QtWidgets.QWidget):
         self.l_header.clear()
         self.l_header.insertPlainText('card\tvalue\tcomment\n')
         for card in header.cards:
-            self.l_header.setTextColor(QtGui.QColor('blue'))
+            self.l_header.setTextColor(QColor('blue'))
             self.l_header.insertPlainText(str(card[0]) + "\t")
-            self.l_header.setTextColor(QtGui.QColor('black'))
+            self.l_header.setTextColor(QColor('black'))
             self.l_header.insertPlainText(str(card[1]) + "\t")
-            self.l_header.setTextColor(QtGui.QColor('red'))
+            self.l_header.setTextColor(QColor('red'))
             self.l_header.insertPlainText(str(card[2]) + "\n")
 
         sb = self.l_header.verticalScrollBar()
         sb.setValue(sb.maximum())
 
 
-class ObjectWidget(QtWidgets.QWidget):
+class ObjectWidget(QWidget):
     """
     Widget for editing Volume parameters
     """
-    signal_objet_changed = QtCore.pyqtSignal(name='objectChanged')
-    signal_file_loaded = QtCore.pyqtSignal(name='fileLoaded')
-    signal_camera_changed = QtCore.pyqtSignal(name='cameraChanged')
-    signal_fov_changed = QtCore.pyqtSignal(name='fovChanged')
-    signal_autorotate_changed = QtCore.pyqtSignal(name='autorotateChanged')
-    # signal_log_scale_changed = QtCore.pyqtSignal(name='log_scaleChanged')
-    signal_scaling_changed = QtCore.pyqtSignal(name='scalingChanged')
-    signal_threshold_changed = QtCore.pyqtSignal(name='thresholdChanged')
-    signal_color_scale_changed = QtCore.pyqtSignal(name='color_scaleChanged')
-    signal_filter_size_changed = QtCore.pyqtSignal(name='filter_sizeChanged')
-    signal_filter_type_changed = QtCore.pyqtSignal(name='filter_typeChanged')
-    signal_high_discard_filter_changed = QtCore.pyqtSignal(name='high_discard_filterChanged')
-    signal_low_discard_filter_changed = QtCore.pyqtSignal(name='low_discard_filterChanged')
-    signal_density_factor_changed = QtCore.pyqtSignal(name='density_factorChanged')
-    signal_export_image = QtCore.pyqtSignal(name='export_image')
+    signal_objet_changed = pyqtSignal(name='objectChanged')
+    signal_file_loaded = pyqtSignal(name='fileLoaded')
+    signal_camera_changed = pyqtSignal(name='cameraChanged')
+    signal_fov_changed = pyqtSignal(name='fovChanged')
+    signal_autorotate_changed = pyqtSignal(name='autorotateChanged')
+    # signal_log_scale_changed = pyqtSignal(name='log_scaleChanged')
+    signal_scaling_changed = pyqtSignal(name='scalingChanged')
+    signal_threshold_changed = pyqtSignal(name='thresholdChanged')
+    signal_color_scale_changed = pyqtSignal(name='color_scaleChanged')
+    signal_filter_size_changed = pyqtSignal(name='filter_sizeChanged')
+    signal_filter_type_changed = pyqtSignal(name='filter_typeChanged')
+    signal_high_discard_filter_changed = pyqtSignal(name='high_discard_filterChanged')
+    signal_low_discard_filter_changed = pyqtSignal(name='low_discard_filterChanged')
+    signal_density_factor_changed = pyqtSignal(name='density_factorChanged')
+    signal_export_image = pyqtSignal(name='export_image')
 
     def __init__(self, type, parent=None):
         super(ObjectWidget, self).__init__(parent)
@@ -257,226 +281,226 @@ class ObjectWidget(QtWidgets.QWidget):
                 self.widgets_group_dict[group].append([key, array])
 
         if type == 'load_button':
-            self.load_button = QtWidgets.QPushButton("Load Spectral Cube", self)
+            self.load_button = QPushButton("Load Spectral Cube", self)
             self.load_button.clicked.connect(self.showDialog)
             array = [self.load_button]
             serialize_widgets('fits_button', '', array)
 
         elif type == 'view':
-            l_cam = QtWidgets.QLabel("camera ")
+            l_cam = QLabel("camera ")
             self.camera = ['Turntable', 'Fly', 'Arcball']  # 'Perspectivecamera',
-            self.combo_camera = QtWidgets.QComboBox(self)
+            self.combo_camera = QComboBox(self)
             self.combo_camera.addItems(self.camera)
             self.combo_camera.currentIndexChanged.connect(self.update_view)
             array = [l_cam, self.combo_camera]
             serialize_widgets('camera', '', array)
 
-            self.chk_autorotate = QtWidgets.QCheckBox("Autorotate")
+            self.chk_autorotate = QCheckBox("Autorotate")
             self.chk_autorotate.setChecked(False)
             self.chk_autorotate.stateChanged.connect(self.update_autorotate)
             array = [self.chk_autorotate]
             serialize_widgets('autorotate', '', array)
 
-            # self.chk_log_scale = QtWidgets.QCheckBox("Log scale")
+            # self.chk_log_scale = QCheckBox("Log scale")
             # self.chk_log_scale.setChecked(False)
             # self.chk_log_scale.stateChanged.connect(self.update_log_scale)
             # array = [self.chk_log_scale]
             # serialize_widgets('log_scale', array)
 
-            l_fov = QtWidgets.QLabel("Field of View ")
-            self.slider_fov = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            l_fov = QLabel("Field of View ")
+            self.slider_fov = QSlider(Qt.Horizontal, self)
             self.slider_fov.setMinimum(0)
             self.slider_fov.setMaximum(160)
             self.slider_fov.setValue(60)
             self.slider_fov.setTickInterval(5)
-            self.l_fov_value = QtWidgets.QLineEdit(str(self.slider_fov.value()))
+            self.l_fov_value = QLineEdit(str(self.slider_fov.value()))
             self.slider_fov.valueChanged.connect(self.update_fov)
             array = [l_fov, self.slider_fov, self.l_fov_value]
             serialize_widgets('field_of_view', '', array)
 
-            l_scalex = QtWidgets.QLabel("Scale X ")
-            self.slider_scalex = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            l_scalex = QLabel("Scale X ")
+            self.slider_scalex = QSlider(Qt.Horizontal, self)
             self.slider_scalex.setMinimum(1)
             self.slider_scalex.setMaximum(20)
             self.slider_scalex.setValue(1)
             self.slider_scalex.setTickInterval(1)
-            self.l_scalex_value = QtWidgets.QLineEdit(str(self.slider_scalex.value()))
+            self.l_scalex_value = QLineEdit(str(self.slider_scalex.value()))
             self.slider_scalex.valueChanged.connect(self.update_scaling)
             array = [l_scalex, self.slider_scalex, self.l_scalex_value]
             serialize_widgets('scale_x', '', array)
 
-            l_scaley = QtWidgets.QLabel("Scale Y ")
-            self.slider_scaley = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            l_scaley = QLabel("Scale Y ")
+            self.slider_scaley = QSlider(Qt.Horizontal, self)
             self.slider_scaley.setMinimum(1)
             self.slider_scaley.setMaximum(20)
             self.slider_scaley.setValue(1)
             self.slider_scaley.setTickInterval(1)
-            self.l_scaley_value = QtWidgets.QLineEdit(str(self.slider_scaley.value()))
+            self.l_scaley_value = QLineEdit(str(self.slider_scaley.value()))
             self.slider_scaley.valueChanged.connect(self.update_scaling)
             array = [l_scaley, self.slider_scaley, self.l_scaley_value]
             serialize_widgets('scale_y', '', array)
 
-            l_scalez = QtWidgets.QLabel("Scale Z ")
-            self.slider_scalez = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            l_scalez = QLabel("Scale Z ")
+            self.slider_scalez = QSlider(Qt.Horizontal, self)
             self.slider_scalez.setMinimum(1)
             self.slider_scalez.setMaximum(20)
             self.slider_scalez.setValue(1)
             self.slider_scalez.setTickInterval(1)
-            self.l_scalez_value = QtWidgets.QLineEdit(str(self.slider_scalez.value()))
+            self.l_scalez_value = QLineEdit(str(self.slider_scalez.value()))
             self.slider_scalez.valueChanged.connect(self.update_scaling)
             array = [l_scalez, self.slider_scalez, self.l_scalez_value]
             serialize_widgets('scale_z', '', array)
 
         elif type == 'rendering_params':
-            l_tf_method = QtWidgets.QLabel("Transfer function ")
+            l_tf_method = QLabel("Transfer function ")
             # self.l_tf_method = ['mip', 'translucent', 'translucent2', 'iso', 'additive']
             self.tf_method = ['mip', 'lmip', 'wsp', 'iso']
-            self.combo_tf_method = QtWidgets.QComboBox(self)
+            self.combo_tf_method = QComboBox(self)
             self.combo_tf_method.addItems(self.tf_method)
             self.combo_tf_method.currentIndexChanged.connect(self.update_param)
             array = [l_tf_method, self.combo_tf_method]
             serialize_widgets('tf_method', '', array)
 
-            l_density_factor = QtWidgets.QLabel("Density regulator ")
-            self.slider_density_factor = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            l_density_factor = QLabel("Density regulator ")
+            self.slider_density_factor = QSlider(Qt.Horizontal, self)
             self.slider_density_factor.setMinimum(0)
             self.slider_density_factor.setMaximum(10000)
             self.slider_density_factor.setValue(0)
-            self.l_density_factor_value = QtWidgets.QLineEdit(str(1))
+            self.l_density_factor_value = QLineEdit(str(1))
             self.slider_density_factor.valueChanged.connect(self.update_density_factor)
             array = [l_density_factor, self.slider_density_factor, self.l_density_factor_value]
             serialize_widgets('density_factor', '', array)
             for widget in self.widgets_dict['density_factor']:
                 widget.hide()
 
-            l_color_method = QtWidgets.QLabel("Colour method ")
+            l_color_method = QLabel("Colour method ")
             self.color_method = ['Moment 0', 'Moment 1', 'rgb_cube']
-            self.combo_color_method = QtWidgets.QComboBox(self)
+            self.combo_color_method = QComboBox(self)
             self.combo_color_method.addItems(self.color_method)
             self.combo_color_method.currentIndexChanged.connect(self.update_param)
             array = [l_color_method, self.combo_color_method]
             serialize_widgets('color_method', '', array)
 
-            l_threshold = QtWidgets.QLabel("Threshold ")
-            self.slider_threshold = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            l_threshold = QLabel("Threshold ")
+            self.slider_threshold = QSlider(Qt.Horizontal, self)
             self.slider_threshold.setMinimum(0)
             self.slider_threshold.setMaximum(10000)
             self.slider_threshold.setValue(10000)
-            self.l_threshold_value = QtWidgets.QLineEdit(str(self.slider_threshold.value()))
+            self.l_threshold_value = QLineEdit(str(self.slider_threshold.value()))
             self.slider_threshold.valueChanged.connect(self.update_threshold)
             array = [l_threshold, self.slider_threshold, self.l_threshold_value]
             serialize_widgets('threshold', '', array)
             for widget in self.widgets_dict['threshold']:
                 widget.hide()
 
-            l_interpolation_method = QtWidgets.QLabel("Interpolation method ")
+            l_interpolation_method = QLabel("Interpolation method ")
             self.interpolation_method = ['linear', 'nearest']  # ,
             # 'bilinear', 'hanning', 'hamming', 'hermite',
             # 'kaiser', 'quadric', 'bicubic', 'catrom',
             # 'mitchell', 'spline16', 'spline36', 'gaussian',
             # 'bessel', 'sinc', 'lanczos', 'blackman']
-            self.combo_interpolation_method = QtWidgets.QComboBox(self)
+            self.combo_interpolation_method = QComboBox(self)
             self.combo_interpolation_method.addItems(self.interpolation_method)
             self.combo_interpolation_method.currentIndexChanged.connect(self.update_param)
             array = [l_interpolation_method, self.combo_interpolation_method]
             serialize_widgets('interpolation_method', '', array)
 
-            l_cmap = QtWidgets.QLabel("Colour map ")
+            l_cmap = QLabel("Colour map ")
             self.cmap = sorted(list(get_colormaps().keys()), key=str.lower)
-            self.combo_cmap = QtWidgets.QComboBox(self)
+            self.combo_cmap = QComboBox(self)
             self.combo_cmap.addItems(self.cmap)
             self.combo_cmap.currentIndexChanged.connect(self.update_param)
             array = [l_cmap, self.combo_cmap]
             serialize_widgets('cmap', '', array)
 
-        # l_color_scale = QtWidgets.QLabel("Color scale ")
+        # l_color_scale = QLabel("Color scale ")
         # self.color_scale = ['linear', 'log', 'exp']
-        # self.combo_color_scale = QtWidgets.QComboBox(self)
+        # self.combo_color_scale = QComboBox(self)
         # self.combo_color_scale.addItems(self.color_scale)
         # self.combo_color_scale.currentIndexChanged.connect(self.update_color_scale)
         # array = [l_color_scale, self.combo_color_scale]
         # serialize_widgets('color_scale', array)
 
         elif type == 'smoothing':
-            l_filter_size = QtWidgets.QLabel("Box size")
-            self.slider_filter_size = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            l_filter_size = QLabel("Box size")
+            self.slider_filter_size = QSlider(Qt.Horizontal, self)
             self.slider_filter_size.setMinimum(0)
             self.slider_filter_size.setMaximum(10)
             self.slider_filter_size.setValue(0)
-            self.l_filter_size_value = QtWidgets.QLineEdit(str(self.slider_filter_size.value() + 1))
+            self.l_filter_size_value = QLineEdit(str(self.slider_filter_size.value() + 1))
             self.slider_filter_size.valueChanged.connect(self.update_filter_size)
             array = [l_filter_size, self.slider_filter_size, self.l_filter_size_value]
             serialize_widgets('filter_size', '', array)
 
-            # l_use_gaussian_filter = QtWidgets.QLabel("Activate Gaussian smoothing")
+            # l_use_gaussian_filter = QLabel("Activate Gaussian smoothing")
             # self.use_gaussian_filter = ['0', '1']  # 'Perspectivecamera',
-            # self.combo_use_gaussian_filter = QtWidgets.QComboBox(self)
+            # self.combo_use_gaussian_filter = QComboBox(self)
             # self.combo_use_gaussian_filter.addItems(self.use_gaussian_filter)
             # self.combo_use_gaussian_filter.currentIndexChanged.connect(self.update_gaussian_filter_size)
             # array = [l_use_gaussian_filter, self.combo_use_gaussian_filter]
             # serialize_widgets('use_gaussian_filter', array)
 
-            l_gaussian_filter_size = QtWidgets.QLabel("Gaussian size")
-            self.chk_use_gaussian_filter = QtWidgets.QCheckBox("Activate")
+            l_gaussian_filter_size = QLabel("Gaussian size")
+            self.chk_use_gaussian_filter = QCheckBox("Activate")
             self.chk_use_gaussian_filter.setChecked(False)
             self.chk_use_gaussian_filter.stateChanged.connect(self.update_gaussian_filter_size)
             self.gaussian_filter_size = ['5', '9', '13']  # 'Perspectivecamera',
-            self.combo_gaussian_filter_size = QtWidgets.QComboBox(self)
+            self.combo_gaussian_filter_size = QComboBox(self)
             self.combo_gaussian_filter_size.addItems(self.gaussian_filter_size)
             self.combo_gaussian_filter_size.currentIndexChanged.connect(self.update_gaussian_filter_size)
             array = [l_gaussian_filter_size, self.combo_gaussian_filter_size, self.chk_use_gaussian_filter]
             serialize_widgets('gaussian_filter_size', '', array)
 
         elif type == 'filtering':
-            l_filter_type = QtWidgets.QLabel("Filter type")
+            l_filter_type = QLabel("Filter type")
             self.filter_type = ['Filter out', 'Rescale']  # 'Perspectivecamera',
-            self.combo_filter_type = QtWidgets.QComboBox(self)
+            self.combo_filter_type = QComboBox(self)
             self.combo_filter_type.addItems(self.filter_type)
             self.combo_filter_type.currentIndexChanged.connect(self.update_filter_type)
             array = [l_filter_type, self.combo_filter_type]
             serialize_widgets('filter_type', '', array)
 
-            l_high_discard_filter = QtWidgets.QLabel("high filter ")
-            self.slider_high_discard_filter = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            l_high_discard_filter = QLabel("high filter ")
+            self.slider_high_discard_filter = QSlider(Qt.Horizontal, self)
             self.slider_high_discard_filter.setMinimum(0)
             self.slider_high_discard_filter.setMaximum(10000)
             self.slider_high_discard_filter.setValue(10000)
-            self.l_high_discard_filter_value = QtWidgets.QLineEdit(str(self.slider_high_discard_filter.value()))
+            self.l_high_discard_filter_value = QLineEdit(str(self.slider_high_discard_filter.value()))
             self.slider_high_discard_filter.valueChanged.connect(self.update_high_discard_filter)
             array = [l_high_discard_filter, self.slider_high_discard_filter, self.l_high_discard_filter_value]
             serialize_widgets('high_discard_filter', '', array)
             # for widget in self.widgets_dict['high_discard_filter']:
             #     widget.hide()
 
-            l_low_discard_filter = QtWidgets.QLabel("Low filter ")
-            self.slider_low_discard_filter = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            l_low_discard_filter = QLabel("Low filter ")
+            self.slider_low_discard_filter = QSlider(Qt.Horizontal, self)
             self.slider_low_discard_filter.setMinimum(0)
             self.slider_low_discard_filter.setMaximum(10000)
             self.slider_low_discard_filter.setValue(0)
-            self.l_low_discard_filter_value = QtWidgets.QLineEdit(str(self.slider_low_discard_filter.value()))
+            self.l_low_discard_filter_value = QLineEdit(str(self.slider_low_discard_filter.value()))
             self.slider_low_discard_filter.valueChanged.connect(self.update_low_discard_filter)
             array = [l_low_discard_filter, self.slider_low_discard_filter, self.l_low_discard_filter_value]
             serialize_widgets('low_discard_filter', '', array)
 
         elif type == 'image':
-            self.export_image_button = QtWidgets.QPushButton("Save image to...", self)
+            self.export_image_button = QPushButton("Save image to...", self)
             self.export_image_button.clicked.connect(self.export_image)
             array = [self.export_image_button]
             serialize_widgets('export_image', '', array)
 
         # for group in self.widgets_group_array:
         # groupboxes = []
-        # groupbox = QtWidgets.QGroupBox(group)
+        # groupbox = QGroupBox(group)
 
 
         # Add widgets to the grid layout, which is added to the box, which is added to the group.
         widgets_i = 0
-        gbox2 = QtWidgets.QGridLayout()
+        gbox2 = QGridLayout()
         group_i = 0
         for group in self.widgets_group_array:
-            groupbox = QtWidgets.QGroupBox(group)
-            gbox = QtWidgets.QGridLayout()
-            # toolbox = QtWidgets.QToolBox()
+            groupbox = QGroupBox(group)
+            gbox = QGridLayout()
+            # toolbox = QToolBox()
             for key, widgets in self.widgets_group_dict[group]:
             # for widgets in self.widgets_array:
                 widget_i = 1
@@ -498,7 +522,7 @@ class ObjectWidget(QtWidgets.QWidget):
             gbox2.addWidget(groupbox, group_i, 0)
             group_i += 1
 
-        vbox = QtWidgets.QVBoxLayout()
+        vbox = QVBoxLayout()
         # vbox.addItem(gbox2)
         vbox.addItem(gbox2)
         vbox.addStretch(1.0)
@@ -523,7 +547,7 @@ class ObjectWidget(QtWidgets.QWidget):
         self.signal_objet_changed.emit()
 
     def showDialog(self):
-        filename = QtWidgets.QFileDialog.getOpenFileName(self,
+        filename = QFileDialog.getOpenFileName(self,
                                                          'Open file',
                                                          filter='FITS Images (*.fits, *.FITS)')
         # '/Users/danyvohl/code/data')
@@ -1288,12 +1312,12 @@ class Canvas3D(scene.SceneCanvas):
 # -----------------------------------------------------------------------------
 # gloo.gl.use_gl('gl2 debug')
 if __name__ == '__main__':
-    appQt = QtWidgets.QApplication(sys.argv)
+    appQt = QApplication(sys.argv)
     resolution = appQt.desktop().screenGeometry()
 
     # Create and display the splash screen
-    splash_pix = QtGui.QPixmap('images/splash_screen.png')
-    splash = QtWidgets.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
+    splash_pix = QPixmap('images/splash_screen.png')
+    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
     splash.show()
     appQt.processEvents()
