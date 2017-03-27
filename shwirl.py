@@ -9,7 +9,7 @@ import time
 # Vispy imports
 from extern.vispy import app, scene, io
 from extern.vispy.color import get_colormaps
-from shades import RenderVolume
+from shaders import RenderVolume
 
 # Astropy imports
 from astropy.io import fits
@@ -137,7 +137,7 @@ class MainWindow(QMainWindow):
                                self.props['rendering_params'].combo_interpolation_method.currentText())
 
         if self.props['rendering_params'].combo_tf_method.currentText() == 'lmip':
-            print("thres", self.props['rendering_params'].l_threshold_value.text())
+            # print("thres", self.props['rendering_params'].l_threshold_value.text())
             # self.update_threshold(self.props.l_threshold_value.text())
             self.update_threshold()
 
@@ -554,17 +554,17 @@ class ObjectWidget(QWidget):
 
         if filename[0] != "":
             # Load file
-            print(filename)
+            # print(filename)
             self.loaded_cube = fits.open(filename[0])
 
             try:
                 self.vol_min = self.loaded_cube[0].header["DATAMIN"]
                 self.vol_max = self.loaded_cube[0].header["DATAMAX"]
 
-                print("DATAMIN", self.vol_min)
-                print("DATAMAX", self.vol_max)
+                # print("DATAMIN", self.vol_min)
+                # print("DATAMAX", self.vol_max)
             except:
-                print("DATAMIN and DATAMAX not present in header; evaluating min and max")
+                # print("Warning: DATAMIN and DATAMAX not present in header; evaluating min and max")
                 if self.loaded_cube[0].header["NAXIS"] == 3:
                     self.vol_min = np.nanmin(self.loaded_cube[0].data)
                     self.vol_max = np.nanmax(self.loaded_cube[0].data)
@@ -948,7 +948,7 @@ class Canvas3D(scene.SceneCanvas):
             # except:
             #     self.vel = "unknown"
 
-            print(cube[0].data.shape)
+            # print(cube[0].data.shape)
             if len(cube[0].data.shape) == 4:
                 # Test
                 # cube[0].data = np.swapaxes(cube[0].data, 0, 1)
@@ -984,7 +984,7 @@ class Canvas3D(scene.SceneCanvas):
                     self.vel_delt = cube[0].header['CDELT3']
                     set_lim = True
                 except:
-                    print("No CDELT3 card in header.")
+                    # print("No CDELT3 card in header.")
                     set_lim = False
 
                 if self.vel_type == 'VELO-HEL' or self.vel_type == 'FELO-HEL':
@@ -1028,11 +1028,11 @@ class Canvas3D(scene.SceneCanvas):
                     except:
                         self.clim_vel = 0, self.vel_axis
 
-                print("self.clim_vel", self.clim_vel)
+                # print("self.clim_vel", self.clim_vel)
 
             except:
                 self.vel_val = "Undefined"
-                print("self.clim_vel", self.clim_vel)
+                # print("self.clim_vel", self.clim_vel)
 
             data = np.flipud(np.rollaxis(data, 1))
 
@@ -1188,14 +1188,14 @@ class Canvas3D(scene.SceneCanvas):
         self.volume.color_method = combo_color_method
         self.volume.interpolation = interpolation_method
 
-        print(self.volume.color_method)
+        # print(self.volume.color_method)
         if (self.volume.color_method == 0):
             label = str(self.bunit)
-            print("label", label)
+            # print("label", label)
             clim = self.volume.clim
         else:
             label = str(self.vel_type)
-            print("label", label)
+            # print("label", label)
             clim = self.clim_vel
 
         # print ('clim', clim)
@@ -1210,7 +1210,7 @@ class Canvas3D(scene.SceneCanvas):
         try:
             threshold = float(threshold)
         except:
-            print("Threshold: need to be a float")
+            print("Threshold: needs to be a float")
             pass
 
         try:
@@ -1244,7 +1244,7 @@ class Canvas3D(scene.SceneCanvas):
         self.update_clim("low", scaled_value, filter_type)
 
     def update_clim(self, type, value, filter_type):
-        print("self.volume.color_method", self.volume.color_method)
+        # print("self.volume.color_method", self.volume.color_method)
         if self.volume.color_method == 0:
             if filter_type == 'Rescale':
                 if type == "low":

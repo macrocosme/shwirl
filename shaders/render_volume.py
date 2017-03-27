@@ -1264,7 +1264,7 @@ class RenderVolumeVisual(Visual):
 
     @use_gaussian_filter.setter
     def use_gaussian_filter(self, use_gaussian_filter):
-        print ("use_gaussian_filter", use_gaussian_filter)
+        # print ("use_gaussian_filter", use_gaussian_filter)
         self._use_gaussian_filter = int(use_gaussian_filter)
         self.shared_program['u_use_gaussian_filter'] = int(self._use_gaussian_filter)
         self.update()
