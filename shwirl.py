@@ -43,13 +43,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # splitter_h.addWidget(splitter_v)
 
         # Menus / viz options
-        self.widget_types = ['load_button', 'view', 'rendering_params', 'transform', 'smoothing', 'filtering', 'image']
-        self.widget_types_text = {'load_button': 'Data',
-                                  'view': 'View',
-                                  'rendering_params': 'Colouring',
-                                  'transform': 'Axes stretch',
-                                  'smoothing': 'Smooth data',
-                                  'filtering': 'Filter data',
+        self.widget_types = ['load_button', 'view', 'rendering_params', 'filtering', 'smoothing', 'image']
+        self.widget_types_text = {'load_button': 'Import',
+                                  'view': 'Camera and transforms',
+                                  'rendering_params': 'Colour',
+                                  'filtering': 'Filter',
+                                  'smoothing': 'Smooth',
                                   'image': 'Export'}
 
         self.props = {}
@@ -58,15 +57,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.props[type] = ObjectWidget(type)
             toolbox.addItem(self.props[type], self.widget_types_text[type])
 
-        splitter_v.addWidget(toolbox)
-
-        # toolbox.addItem(self.fits_infos, 'FITS metadata')
-        # splitter_v.addWidget(self.props)
-
-        # FITS metadata
         self.fits_infos = FitsMetaWidget()
-        splitter_v.addWidget(self.fits_infos)
+        toolbox.addItem(self.fits_infos, 'Metadata')
+
+        splitter_v.addWidget(toolbox)
         splitter_h.addWidget(splitter_v)
+
+        splitter_h.setSizes([resolution.height(), int(resolution.width()/5.5)])
 
         self.setCentralWidget(splitter_h)
 
@@ -83,7 +80,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.props['view'].signal_autorotate_changed.connect(self.update_autorotate)
         # self.props['view'].signal_log_scale_changed.connect(self.update_log_scale)
-        self.props['transform'].signal_scaling_changed.connect(self.update_scaling)
+        self.props['view'].signal_scaling_changed.connect(self.update_scaling)
         self.props['rendering_params'].signal_threshold_changed.connect(self.update_threshold)
         self.props['rendering_params'].signal_density_factor_changed.connect(self.update_density_factor)
         # self.props.signal_color_scale_changed.connect(self.update_color_scale)
@@ -134,9 +131,9 @@ class MainWindow(QtWidgets.QMainWindow):
     #     self.Canvas3D.set_log_scale(self.props['view'].chk_log_scale.isChecked())
 
     def update_scaling(self):
-        self.Canvas3D.set_scaling(self.props['transform'].slider_scalex.value(),
-                                  self.props['transform'].slider_scaley.value(),
-                                  self.props['transform'].slider_scalez.value())
+        self.Canvas3D.set_scaling(self.props['view'].slider_scalex.value(),
+                                  self.props['view'].slider_scaley.value(),
+                                  self.props['view'].slider_scalez.value())
 
     def update_threshold(self):
         self.Canvas3D.set_threshold(self.props['rendering_params'].l_threshold_value.text())
@@ -260,10 +257,10 @@ class ObjectWidget(QtWidgets.QWidget):
                 self.widgets_group_dict[group].append([key, array])
 
         if type == 'load_button':
-            self.load_button = QtWidgets.QPushButton("Load FITS", self)
+            self.load_button = QtWidgets.QPushButton("Load Spectral Cube", self)
             self.load_button.clicked.connect(self.showDialog)
             array = [self.load_button]
-            serialize_widgets('fits_button', 'Data', array)
+            serialize_widgets('fits_button', '', array)
 
         elif type == 'view':
             l_cam = QtWidgets.QLabel("camera ")
@@ -272,13 +269,13 @@ class ObjectWidget(QtWidgets.QWidget):
             self.combo_camera.addItems(self.camera)
             self.combo_camera.currentIndexChanged.connect(self.update_view)
             array = [l_cam, self.combo_camera]
-            serialize_widgets('camera', 'Point of view', array)
+            serialize_widgets('camera', '', array)
 
             self.chk_autorotate = QtWidgets.QCheckBox("Autorotate")
             self.chk_autorotate.setChecked(False)
             self.chk_autorotate.stateChanged.connect(self.update_autorotate)
             array = [self.chk_autorotate]
-            serialize_widgets('autorotate', 'Point of view', array)
+            serialize_widgets('autorotate', '', array)
 
             # self.chk_log_scale = QtWidgets.QCheckBox("Log scale")
             # self.chk_log_scale.setChecked(False)
@@ -295,7 +292,40 @@ class ObjectWidget(QtWidgets.QWidget):
             self.l_fov_value = QtWidgets.QLineEdit(str(self.slider_fov.value()))
             self.slider_fov.valueChanged.connect(self.update_fov)
             array = [l_fov, self.slider_fov, self.l_fov_value]
-            serialize_widgets('field_of_view', 'Point of view', array)
+            serialize_widgets('field_of_view', '', array)
+
+            l_scalex = QtWidgets.QLabel("Scale X ")
+            self.slider_scalex = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            self.slider_scalex.setMinimum(1)
+            self.slider_scalex.setMaximum(20)
+            self.slider_scalex.setValue(1)
+            self.slider_scalex.setTickInterval(1)
+            self.l_scalex_value = QtWidgets.QLineEdit(str(self.slider_scalex.value()))
+            self.slider_scalex.valueChanged.connect(self.update_scaling)
+            array = [l_scalex, self.slider_scalex, self.l_scalex_value]
+            serialize_widgets('scale_x', '', array)
+
+            l_scaley = QtWidgets.QLabel("Scale Y ")
+            self.slider_scaley = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            self.slider_scaley.setMinimum(1)
+            self.slider_scaley.setMaximum(20)
+            self.slider_scaley.setValue(1)
+            self.slider_scaley.setTickInterval(1)
+            self.l_scaley_value = QtWidgets.QLineEdit(str(self.slider_scaley.value()))
+            self.slider_scaley.valueChanged.connect(self.update_scaling)
+            array = [l_scaley, self.slider_scaley, self.l_scaley_value]
+            serialize_widgets('scale_y', '', array)
+
+            l_scalez = QtWidgets.QLabel("Scale Z ")
+            self.slider_scalez = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+            self.slider_scalez.setMinimum(1)
+            self.slider_scalez.setMaximum(20)
+            self.slider_scalez.setValue(1)
+            self.slider_scalez.setTickInterval(1)
+            self.l_scalez_value = QtWidgets.QLineEdit(str(self.slider_scalez.value()))
+            self.slider_scalez.valueChanged.connect(self.update_scaling)
+            array = [l_scalez, self.slider_scalez, self.l_scalez_value]
+            serialize_widgets('scale_z', '', array)
 
         elif type == 'rendering_params':
             l_tf_method = QtWidgets.QLabel("Transfer function ")
@@ -305,7 +335,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.combo_tf_method.addItems(self.tf_method)
             self.combo_tf_method.currentIndexChanged.connect(self.update_param)
             array = [l_tf_method, self.combo_tf_method]
-            serialize_widgets('tf_method', 'Rendering parameters', array)
+            serialize_widgets('tf_method', '', array)
 
             l_density_factor = QtWidgets.QLabel("Density regulator ")
             self.slider_density_factor = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
@@ -315,7 +345,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.l_density_factor_value = QtWidgets.QLineEdit(str(1))
             self.slider_density_factor.valueChanged.connect(self.update_density_factor)
             array = [l_density_factor, self.slider_density_factor, self.l_density_factor_value]
-            serialize_widgets('density_factor', 'Rendering parameters', array)
+            serialize_widgets('density_factor', '', array)
             for widget in self.widgets_dict['density_factor']:
                 widget.hide()
 
@@ -325,7 +355,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.combo_color_method.addItems(self.color_method)
             self.combo_color_method.currentIndexChanged.connect(self.update_param)
             array = [l_color_method, self.combo_color_method]
-            serialize_widgets('color_method', 'Rendering parameters', array)
+            serialize_widgets('color_method', '', array)
 
             l_threshold = QtWidgets.QLabel("Threshold ")
             self.slider_threshold = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
@@ -335,7 +365,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.l_threshold_value = QtWidgets.QLineEdit(str(self.slider_threshold.value()))
             self.slider_threshold.valueChanged.connect(self.update_threshold)
             array = [l_threshold, self.slider_threshold, self.l_threshold_value]
-            serialize_widgets('threshold', 'Rendering parameters', array)
+            serialize_widgets('threshold', '', array)
             for widget in self.widgets_dict['threshold']:
                 widget.hide()
 
@@ -349,7 +379,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.combo_interpolation_method.addItems(self.interpolation_method)
             self.combo_interpolation_method.currentIndexChanged.connect(self.update_param)
             array = [l_interpolation_method, self.combo_interpolation_method]
-            serialize_widgets('interpolation_method', 'Rendering parameters', array)
+            serialize_widgets('interpolation_method', '', array)
 
             l_cmap = QtWidgets.QLabel("Colour map ")
             self.cmap = sorted(list(get_colormaps().keys()), key=str.lower)
@@ -357,7 +387,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.combo_cmap.addItems(self.cmap)
             self.combo_cmap.currentIndexChanged.connect(self.update_param)
             array = [l_cmap, self.combo_cmap]
-            serialize_widgets('cmap', 'Rendering parameters', array)
+            serialize_widgets('cmap', '', array)
 
         # l_color_scale = QtWidgets.QLabel("Color scale ")
         # self.color_scale = ['linear', 'log', 'exp']
@@ -367,42 +397,8 @@ class ObjectWidget(QtWidgets.QWidget):
         # array = [l_color_scale, self.combo_color_scale]
         # serialize_widgets('color_scale', array)
 
-        elif type == 'transform':
-            l_scalex = QtWidgets.QLabel("Scale X ")
-            self.slider_scalex = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_scalex.setMinimum(1)
-            self.slider_scalex.setMaximum(20)
-            self.slider_scalex.setValue(1)
-            self.slider_scalex.setTickInterval(1)
-            self.l_scalex_value = QtWidgets.QLineEdit(str(self.slider_scalex.value()))
-            self.slider_scalex.valueChanged.connect(self.update_scaling)
-            array = [l_scalex, self.slider_scalex, self.l_scalex_value]
-            serialize_widgets('scale_x', 'Transform', array)
-
-            l_scaley = QtWidgets.QLabel("Scale Y ")
-            self.slider_scaley = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_scaley.setMinimum(1)
-            self.slider_scaley.setMaximum(20)
-            self.slider_scaley.setValue(1)
-            self.slider_scaley.setTickInterval(1)
-            self.l_scaley_value = QtWidgets.QLineEdit(str(self.slider_scaley.value()))
-            self.slider_scaley.valueChanged.connect(self.update_scaling)
-            array = [l_scaley, self.slider_scaley, self.l_scaley_value]
-            serialize_widgets('scale_y', 'Transform', array)
-
-            l_scalez = QtWidgets.QLabel("Scale Z ")
-            self.slider_scalez = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_scalez.setMinimum(1)
-            self.slider_scalez.setMaximum(20)
-            self.slider_scalez.setValue(1)
-            self.slider_scalez.setTickInterval(1)
-            self.l_scalez_value = QtWidgets.QLineEdit(str(self.slider_scalez.value()))
-            self.slider_scalez.valueChanged.connect(self.update_scaling)
-            array = [l_scalez, self.slider_scalez, self.l_scalez_value]
-            serialize_widgets('scale_z', 'Transform', array)
-
         elif type == 'smoothing':
-            l_filter_size = QtWidgets.QLabel("Box size ")
+            l_filter_size = QtWidgets.QLabel("Box size")
             self.slider_filter_size = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
             self.slider_filter_size.setMinimum(0)
             self.slider_filter_size.setMaximum(10)
@@ -410,7 +406,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.l_filter_size_value = QtWidgets.QLineEdit(str(self.slider_filter_size.value() + 1))
             self.slider_filter_size.valueChanged.connect(self.update_filter_size)
             array = [l_filter_size, self.slider_filter_size, self.l_filter_size_value]
-            serialize_widgets('filter_size', 'Smoothing', array)
+            serialize_widgets('filter_size', '', array)
 
             # l_use_gaussian_filter = QtWidgets.QLabel("Activate Gaussian smoothing")
             # self.use_gaussian_filter = ['0', '1']  # 'Perspectivecamera',
@@ -420,7 +416,7 @@ class ObjectWidget(QtWidgets.QWidget):
             # array = [l_use_gaussian_filter, self.combo_use_gaussian_filter]
             # serialize_widgets('use_gaussian_filter', array)
 
-            l_gaussian_filter_size = QtWidgets.QLabel("Gaussian size ")
+            l_gaussian_filter_size = QtWidgets.QLabel("Gaussian size")
             self.chk_use_gaussian_filter = QtWidgets.QCheckBox("Activate")
             self.chk_use_gaussian_filter.setChecked(False)
             self.chk_use_gaussian_filter.stateChanged.connect(self.update_gaussian_filter_size)
@@ -429,7 +425,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.combo_gaussian_filter_size.addItems(self.gaussian_filter_size)
             self.combo_gaussian_filter_size.currentIndexChanged.connect(self.update_gaussian_filter_size)
             array = [l_gaussian_filter_size, self.combo_gaussian_filter_size, self.chk_use_gaussian_filter]
-            serialize_widgets('gaussian_filter_size', 'Smoothing', array)
+            serialize_widgets('gaussian_filter_size', '', array)
 
         elif type == 'filtering':
             l_filter_type = QtWidgets.QLabel("Filter type")
@@ -438,7 +434,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.combo_filter_type.addItems(self.filter_type)
             self.combo_filter_type.currentIndexChanged.connect(self.update_filter_type)
             array = [l_filter_type, self.combo_filter_type]
-            serialize_widgets('filter_type', 'Filtering', array)
+            serialize_widgets('filter_type', '', array)
 
             l_high_discard_filter = QtWidgets.QLabel("high filter ")
             self.slider_high_discard_filter = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
@@ -448,7 +444,7 @@ class ObjectWidget(QtWidgets.QWidget):
             self.l_high_discard_filter_value = QtWidgets.QLineEdit(str(self.slider_high_discard_filter.value()))
             self.slider_high_discard_filter.valueChanged.connect(self.update_high_discard_filter)
             array = [l_high_discard_filter, self.slider_high_discard_filter, self.l_high_discard_filter_value]
-            serialize_widgets('high_discard_filter', 'Filtering', array)
+            serialize_widgets('high_discard_filter', '', array)
             # for widget in self.widgets_dict['high_discard_filter']:
             #     widget.hide()
 
@@ -460,13 +456,13 @@ class ObjectWidget(QtWidgets.QWidget):
             self.l_low_discard_filter_value = QtWidgets.QLineEdit(str(self.slider_low_discard_filter.value()))
             self.slider_low_discard_filter.valueChanged.connect(self.update_low_discard_filter)
             array = [l_low_discard_filter, self.slider_low_discard_filter, self.l_low_discard_filter_value]
-            serialize_widgets('low_discard_filter', 'Filtering', array)
+            serialize_widgets('low_discard_filter', '', array)
 
         elif type == 'image':
             self.export_image_button = QtWidgets.QPushButton("Save image to...", self)
             self.export_image_button.clicked.connect(self.export_image)
             array = [self.export_image_button]
-            serialize_widgets('export_image', 'Image', array)
+            serialize_widgets('export_image', '', array)
 
         # for group in self.widgets_group_array:
         # groupboxes = []
@@ -476,29 +472,35 @@ class ObjectWidget(QtWidgets.QWidget):
         # Add widgets to the grid layout, which is added to the box, which is added to the group.
         widgets_i = 0
         gbox2 = QtWidgets.QGridLayout()
-        # for group in self.widgets_group_array:
-        gbox = QtWidgets.QGridLayout()
-        # toolbox = QtWidgets.QStyleOptionToolBox()
-        # for key, widgets in self.widgets_group_dict[group]:
-        for widgets in self.widgets_array:
-            widget_i = 1
-            for widget in widgets:
-                gbox.addWidget(widget, widgets_i, widget_i)
-                # toolbox.addItem(widget, key)
-                if widgets_i > 0:
-                    widget.setEnabled(False)
+        group_i = 0
+        for group in self.widgets_group_array:
+            groupbox = QtWidgets.QGroupBox(group)
+            gbox = QtWidgets.QGridLayout()
+            # toolbox = QtWidgets.QToolBox()
+            for key, widgets in self.widgets_group_dict[group]:
+            # for widgets in self.widgets_array:
+                widget_i = 1
+                for widget in widgets:
 
-                widget_i += 1
-            widgets_i += 1
+                    gbox.addWidget(widget, widgets_i, widget_i)
+                    # toolbox.addItem(widget, key)
+                    if type != 'load_button':
+                    # if widgets_i > 0:
+                        widget.setEnabled(False)
+
+                    widget_i += 1
+                widgets_i += 1
 
             # groupbox.setLayout(gridbox)
-            # groupbox.setLayout(gbox)
+            groupbox.setLayout(gbox)
+
             # toolbox.addItem(gbox)
-            # gbox2.addWidget(toolbox)
+            gbox2.addWidget(groupbox, group_i, 0)
+            group_i += 1
 
         vbox = QtWidgets.QVBoxLayout()
         # vbox.addItem(gbox2)
-        vbox.addItem(gbox)
+        vbox.addItem(gbox2)
         vbox.addStretch(1.0)
 
         self.setLayout(vbox)
