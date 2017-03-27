@@ -1,6 +1,8 @@
 About shwirl
 =============
 
+![alt text](docs/_static/shwirl_splash.png "Shwirl")
+
 **shwirl** is a custom standalone Python program to visualise spectral data cubes with ray-tracing volume rendering.
 The program has been developed to investigate transfer functions and graphics shaders as enablers for
 scientific visualisation of astronomical data. Details about transfer functions and shaders developed and implemented in
@@ -12,8 +14,8 @@ used to compute several properties of the final image such as colour, depth, and
 Shaders are particularly suited to computing transfer functions, and are an integral part of the graphics
 pipeline on Graphics Processing Units.
 
-The code is available at https://github.com/macrocosme/shwirl. The program utilises [Astropy](http://www.astropy.org)
-to handle FITS files and World Coordinate System, [Qt](http://www.qtcentre.org) (and [PyQt](https://www.riverbankcomputing.com/software/pyqt/download5)) for the user interface,
+The program utilises [Astropy](http://www.astropy.org) to handle FITS files and World Coordinate System, 
+[Qt](http://www.qtcentre.org) (and [PyQt](https://www.riverbankcomputing.com/software/pyqt/download5)) for the user interface,
 and [VisPy](http://vispy.org), an object-oriented Python visualisation library binding onto OpenGL.
 We implemented the algorithms in the fragment shader using the GLSL language.
 
