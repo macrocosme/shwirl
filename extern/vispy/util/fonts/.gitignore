@@ -1,0 +1,33 @@
+# Compiled files
+[*/]*.py[cod]
+[*/]*.ipynb
+[*/]*.a
+[*/]*.o
+[*/]*.so
+[*/]*.pyd
+[*/]*.pyc
+[*/]*.xml
+[*/]*__pycache__
+
+[*/]*.c
+
+# Other
+[*/]*.cache
+[*/]*.tox
+[*/]*.*.swp
+[*/]*.*.swo
+[*/]**~
+[*/]*.project
+[*/]*.pydevproject
+[*/]*.settings
+[*/]*.coverage
+[*/]*cover
+[*/]*htmlcov
+
+# Mac OSX
+.DS_Store
+
+# PyCharm
+.idea
+
+*.pdf
