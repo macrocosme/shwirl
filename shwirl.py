@@ -31,7 +31,7 @@ except:
             pass
 
         from PyQt4 import QtGui, QtCore
-        from PyQt4.QtCore import Qt
+        from PyQt4.QtCore import Qt, pyqtSignal
         from PyQt4.QtGui import *
     except:
         print ("Requires PyQt5 or PyQt4. None found.")
