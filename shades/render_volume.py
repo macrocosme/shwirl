@@ -34,22 +34,20 @@ from __future__ import division
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # ===========================================================================
 #
-# This modified version is released under the (new) BSD license:
-#
-#   Copyright (c) 2015, Dany Vohl
-#   All rights reserved.
-#
-# A copy of the license is available in the root directory of this project.
-#
+# This modified version is not yet released under any license !
 
-from extern.vispy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
-from extern.vispy.visuals import Visual
-from extern.vispy.visuals.shaders import Function
-from extern.vispy.color import get_colormap
-from extern.vispy.scene.visuals import create_visual_node
-from extern.vispy.io import load_spatial_filters
+from vispy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
+from vispy.visuals import Visual
+from vispy.visuals.shaders import Function
+from vispy.color import get_colormap
+from vispy.scene.visuals import create_visual_node
+from vispy.io import load_spatial_filters
 
 import numpy as np
+
+# todo: implement more render methods (port from visvis)
+# todo: allow anisotropic data
+# todo: what to do about lighting? ambi/diffuse/spec/shinynes on each visual?
 
 # Vertex shader
 VERT_SHADER = """
@@ -87,7 +85,6 @@ FRAG_SHADER = """
 // uniforms
 uniform $sampler_type u_volumetex;
 uniform vec3 u_shape;
-uniform vec3 u_resolution;
 uniform float u_threshold;
 uniform float u_relative_step_size;
 //uniform int u_color_scale;
@@ -98,18 +95,14 @@ uniform float u_relative_step_size;
 uniform int u_filter_size;
 uniform float u_filter_coeff;
 uniform int u_filter_arm;
-uniform int u_filter_type;
 
 uniform int u_use_gaussian_filter;
 uniform int u_gaussian_filter_size;
-
-//uniform int u_log_scale;
 
 // Volume Stats
 //uniform float u_volume_mean;
 //uniform float u_volume_std;
 //uniform float u_volume_madfm;
-uniform float u_high_discard_filter_value;
 uniform float u_low_discard_filter_value;
 uniform float u_density_factor;
 
@@ -148,6 +141,8 @@ vec4 movingAverageFilter_line_of_sight(vec3 loc, vec3 step)
 {{
     // Initialise variables
     vec4 partial_color = vec4(0.0, 0.0, 0.0, 0.0);
+    //int arm = int(floor(u_filter_size/2));
+    //float coeff = 1./float(u_filter_size);
 
     for ( int i=1; i<=u_filter_arm; i++ )
     {{
@@ -163,78 +158,42 @@ vec4 movingAverageFilter_line_of_sight(vec3 loc, vec3 step)
     return partial_color;
 }}
 
-vec4 Gaussian_5(vec4 color_original, vec3 loc, vec3 direction) {{
+vec4 Gaussian_5(vec3 loc, vec3 resolution, vec3 direction) {{
   vec4 color = vec4(0.0);
-  vec3 off1 = 1.3333333333333333 * direction;
-  color += color_original * 0.29411764705882354;
-  color += $sample(u_volumetex, loc + (off1 * u_resolution)) * 0.35294117647058826;
-  color += $sample(u_volumetex, loc - (off1 * u_resolution)) * 0.35294117647058826;
+  vec3 off1 = vec3(1.3333333333333333) * direction;
+  color += $sample(u_volumetex, loc) * 0.29411764705882354;
+  color += $sample(u_volumetex, loc + (off1 / resolution)) * 0.35294117647058826;
+  color += $sample(u_volumetex, loc - (off1 / resolution)) * 0.35294117647058826;
   return color;
 }}
 
-vec4 Gaussian_9(vec4 color_original, vec3 loc, vec3 direction)
+vec4 Gaussian_9(vec3 loc, vec3 resolution, vec3 direction)
 {{
     vec4 color = vec4(0.0);
-    vec3 off1 = 1.3846153846 * direction;
-    vec3 off2 = 3.2307692308 * direction;
-    color += color_original * 0.2270270270;
-    color += $sample(u_volumetex, loc + (off1 * u_resolution)) * 0.3162162162;
-    color += $sample(u_volumetex, loc - (off1 * u_resolution)) * 0.3162162162;
-    color += $sample(u_volumetex, loc + (off2 * u_resolution)) * 0.0702702703;
-    color += $sample(u_volumetex, loc - (off2 * u_resolution)) * 0.0702702703;
+    vec3 off1 = vec3(1.3846153846) * direction;
+    vec3 off2 = vec3(3.2307692308) * direction;
+    color += $sample(u_volumetex, loc) * 0.2270270270;
+    color += $sample(u_volumetex, loc + (off1 / resolution)) * 0.3162162162;
+    color += $sample(u_volumetex, loc - (off1 / resolution)) * 0.3162162162;
+    color += $sample(u_volumetex, loc + (off2 / resolution)) * 0.0702702703;
+    color += $sample(u_volumetex, loc - (off2 / resolution)) * 0.0702702703;
     return color;
 }}
 
-vec4 Gaussian_13(vec4 color_original, vec3 loc, vec3 direction) {{
+vec4 Gaussian_13(vec3 loc, vec3 resolution, vec3 direction) {{
   vec4 color = vec4(0.0);
-  vec3 off1 = 1.411764705882353 * direction;
-  vec3 off2 = 3.2941176470588234 * direction;
-  vec3 off3 = 5.176470588235294 * direction;
-  color += color_original * 0.1964825501511404;
-  color += $sample(u_volumetex, loc + (off1 * u_resolution)) * 0.2969069646728344;
-  color += $sample(u_volumetex, loc - (off1 * u_resolution)) * 0.2969069646728344;
-  color += $sample(u_volumetex, loc + (off2 * u_resolution)) * 0.09447039785044732;
-  color += $sample(u_volumetex, loc - (off2 * u_resolution)) * 0.09447039785044732;
-  color += $sample(u_volumetex, loc + (off3 * u_resolution)) * 0.010381362401148057;
-  color += $sample(u_volumetex, loc - (off3 * u_resolution)) * 0.010381362401148057;
+  vec3 off1 = vec3(1.411764705882353) * direction;
+  vec3 off2 = vec3(3.2941176470588234) * direction;
+  vec3 off3 = vec3(5.176470588235294) * direction;
+  color += $sample(u_volumetex, loc) * 0.1964825501511404;
+  color += $sample(u_volumetex, loc + (off1 / resolution)) * 0.2969069646728344;
+  color += $sample(u_volumetex, loc - (off1 / resolution)) * 0.2969069646728344;
+  color += $sample(u_volumetex, loc + (off2 / resolution)) * 0.09447039785044732;
+  color += $sample(u_volumetex, loc - (off2 / resolution)) * 0.09447039785044732;
+  color += $sample(u_volumetex, loc + (off3 / resolution)) * 0.010381362401148057;
+  color += $sample(u_volumetex, loc - (off3 / resolution)) * 0.010381362401148057;
   return color;
 }}
-
-// ----------------------------------------------------------------
-// ----------------------------------------------------------------
-// Edge detection Pass
-// (adapted from https://www.shadertoy.com/view/MscSzf#)
-// ----------------------------------------------------------------
-float checkSame(vec4 center, vec4 sample, vec3 resolution) {{
-    vec2 centerNormal = center.xy;
-    float centerDepth = center.z;
-    vec2 sampleNormal = sample.xy;
-    float sampleDepth = sample.z;
-
-    vec2 sensitivity = (vec2(0.3, 1.5) * resolution.y / 50.0);
-
-    vec2 diffNormal = abs(centerNormal - sampleNormal) * sensitivity.x;
-    bool isSameNormal = (diffNormal.x + diffNormal.y) < 0.1;
-    float diffDepth = abs(centerDepth - sampleDepth) * sensitivity.y;
-    bool isSameDepth = diffDepth < 0.1;
-
-    return (isSameNormal && isSameDepth) ? 1.0 : 0.0;
-}}
-
-vec4 edge_detection(vec4 color_original, vec3 loc, vec3 step, vec3 resolution) {{
-
-    vec4 sample1 = $sample(u_volumetex, loc + (vec3(1., 1., 0.) / resolution));
-    vec4 sample2 = $sample(u_volumetex, loc + (vec3(-1., -1., 0.) / resolution));
-    vec4 sample3 = $sample(u_volumetex, loc + (vec3(-1., 1., 0.) / resolution));
-    vec4 sample4 = $sample(u_volumetex, loc + (vec3(1., -1., 0.) / resolution));
-
-    float edge = checkSame(sample1, sample2, resolution) *
-                 checkSame(sample3, sample4, resolution);
-
-    return vec4(color_original.rgb, 1-edge);
-}}
-// ----------------------------------------------------------------
-// ----------------------------------------------------------------
 
 // Used with iso surface
 vec4 calculateColor(vec4 betterColor, vec3 loc, vec3 step)
@@ -350,12 +309,6 @@ void main() {{
 
     vec3 loc = start_loc;
     int iter = 0;
-
-
-    float discard_ratio = 1.0 / (u_high_discard_filter_value - u_low_discard_filter_value);
-    float low_discard_ratio = 1.0 / u_low_discard_filter_value;
-
-
     for (iter=0; iter<nsteps; iter++)
     {{
         // Get sample color
@@ -368,93 +321,61 @@ void main() {{
         }}
 
         if (u_use_gaussian_filter==1) {{
-            vec4 temp_color;
-            vec3 direction;
             if (u_gaussian_filter_size == 5){{
                 // horizontal
-                direction = vec3(1., 0., 0.);
-                temp_color = Gaussian_5(color, loc, direction);
+                vec3 direction = vec3(u_filter_size,0.,0.);
+                color = Gaussian_5(loc, u_shape, direction);
 
                 // vertical
-                direction = vec3(0., 1., 0.);
-                temp_color = Gaussian_5(temp_color, loc, direction);
+                direction = vec3(0.,u_filter_size,0.);
+                color = Gaussian_5(loc, u_shape, direction);
 
                 // depth
-                direction = vec3(0., 0., 1.);
-                temp_color = Gaussian_5(temp_color, loc, direction);
+                direction = vec3(0., 0., u_filter_size);
+                color = Gaussian_5(loc, u_shape, direction);
             }}
 
             if (u_gaussian_filter_size == 9){{
                 // horizontal
-                direction = vec3(1., 0., 0.);
-                temp_color = Gaussian_9(color, loc, direction);
+                vec3 direction = vec3(u_filter_size,0.,0.);
+                color = Gaussian_9(loc, u_shape, direction);
 
                 // vertical
-                direction = vec3(0., 1., 0.);
-                temp_color = Gaussian_9(temp_color, loc, direction);
+                direction = vec3(0.,u_filter_size,0.);
+                color = Gaussian_9(loc, u_shape, direction);
 
                 // depth
-                direction = vec3(0., 0., 1.);
-                temp_color = Gaussian_9(temp_color, loc, direction);
+                direction = vec3(0., 0., u_filter_size);
+                color = Gaussian_9(loc, u_shape, direction);
             }}
 
             if (u_gaussian_filter_size == 13){{
                 // horizontal
-                direction = vec3(1., 0., 0.);
-                temp_color = Gaussian_13(color, loc, direction);
+                vec3 direction = vec3(u_filter_size,0.,0.);
+                color = Gaussian_13(loc, u_shape, direction);
 
                 // vertical
-                direction = vec3(0., 1., 0.);
-                temp_color = Gaussian_13(temp_color, loc, direction);
+                direction = vec3(0.,u_filter_size,0.);
+                color = Gaussian_13(loc, u_shape, direction);
 
                 // depth
-                direction = vec3(0., 0., 1.);
-                temp_color = Gaussian_13(temp_color, loc, direction);
+                direction = vec3(0., 0., u_filter_size);
+                color = Gaussian_13(loc, u_shape, direction);
             }}
-            color = temp_color;
+
         }}
+
 
         float val = color.g;
 
         // To force activating the uniform - this should be done differently
         float density_factor = u_density_factor;
 
-        if (u_filter_type == 1) {{
-            // Get rid of very strong signal values
-            if (val > u_high_discard_filter_value)
-            {{
-                val = 0.;
-            }}
-
-            // Don't consider noisy values
-            //if (val < u_volume_mean - 3*u_volume_std)
-            if (val < u_low_discard_filter_value)
-            {{
-                val = 0.;
-            }}
-
-            if (u_low_discard_filter_value == u_high_discard_filter_value)
-            {{
-                if (u_low_discard_filter_value != 0.)
-                {{
-                    val *= low_discard_ratio;
-                }}
-            }}
-            else {{
-                val -= u_low_discard_filter_value;
-                val *= discard_ratio;
-            }}
-        }}
-        else {{
-            if (val > u_high_discard_filter_value)
-            {{
-                val = 0.;
-            }}
-
-            if (val < u_low_discard_filter_value)
-            {{
-                val = 0.;
-            }}
+        // Don't consider noisy values
+        //if (val < u_volume_mean - 3*u_volume_std)
+        if (val < u_low_discard_filter_value)
+        {{
+            val = 0.;
         }}
 
         {in_loop}
@@ -464,8 +385,6 @@ void main() {{
     }}
 
     {after_loop}
-
-    //gl_FragColor = edge_detection(gl_FragColor, loc, step, u_shape);
 
     /* Set depth value - from visvis TODO
     int iter_depth = int(maxi);
@@ -482,7 +401,6 @@ void main() {{
 
 """  # noqa
 
-
 MIP_SNIPPETS = dict(
     before_loop="""
         float maxval = -99999.0; // The maximum encountered value
@@ -497,50 +415,28 @@ MIP_SNIPPETS = dict(
     after_loop="""
         // Refine search for max value
         loc = start_loc + step * (float(maxi) - 0.5);
-
         for (int i=0; i<10; i++) {
             maxval = max(maxval, $sample(u_volumetex, loc).g);
             loc += step * 0.1;
         }
 
-        if (maxval > u_high_discard_filter_value || maxval < u_low_discard_filter_value)
-        {{
+        if (maxval < u_low_discard_filter_value) {
             maxval = 0.;
-        }}
+        }
 
         // Color is associated to voxel intensity
         if (u_color_method == 0) {
             gl_FragColor = $cmap(maxval);
-            //gl_FragColor.a = maxval;
         }
-        else{
-            // Color is associated to redshift/velocity
-            if (u_color_method == 1) {
-                gl_FragColor = $cmap(loc.y);
-
-                //if (maxval == 0)
-                    gl_FragColor.a = maxval;
-            }
-            // Color is associated to RGB cube
-            else {
-                if (u_color_method == 2) {
-                    gl_FragColor.r = loc.y;
-                    gl_FragColor.g = loc.z;
-                    gl_FragColor.b = loc.x;
-                    gl_FragColor.a = maxval;
-                }
-                // Case 4: Mom2
-                // TODO: verify implementation of MIP-mom2.
-                else {
-                   gl_FragColor = $cmap((maxval * ((maxval - loc.y) * (maxval - loc.y))) / maxval);
-                }
-            }
+        // Color is associated to redshift/velocity
+        else {
+            gl_FragColor = $cmap(loc.y);
+            gl_FragColor.a = maxval;
         }
 
         """,
 )
 MIP_FRAG_SHADER = FRAG_SHADER.format(**MIP_SNIPPETS)
-
 
 LMIP_SNIPPETS = dict(
     before_loop="""
@@ -575,18 +471,13 @@ LMIP_SNIPPETS = dict(
             loc += step * 0.1;
         }
 
-        if (local_maxval > u_high_discard_filter_value) {
-            local_maxval = 0.;
-        }
-
         if (local_maxval < u_low_discard_filter_value) {
             local_maxval = 0.;
         }
 
         // Color is associated to voxel intensity
         if (u_color_method == 0) {
-            gl_FragColor = $cmap(local_maxval);
-            gl_FragColor.a = local_maxval;
+            gl_FragColor = $cmap(local_maxval);;
         }
         // Color is associated to redshift/velocity
         else {
@@ -597,159 +488,46 @@ LMIP_SNIPPETS = dict(
 )
 LMIP_FRAG_SHADER = FRAG_SHADER.format(**LMIP_SNIPPETS)
 
-
 TRANSLUCENT_SNIPPETS = dict(
     before_loop="""
         vec4 integrated_color = vec4(0., 0., 0., 0.);
-        float mom0 = 0.;
-        float mom1 = 0.;
-        float ratio = 1/nsteps; // final average
-        float a1 = 0.;
-        float a2 = 0.;
         """,
     in_loop="""
-            float alpha;
-            // Case 1: Color is associated to voxel intensity
+            // Color is associated to voxel intensity
             if (u_color_method == 0) {
-                /*color = $cmap(val);
-                a1 = integrated_color.a;
-                a2 = val * density_factor * (1 - a1);
-
-                alpha = max(a1 + a2, 0.001);
-
-                integrated_color *= a1 / alpha;
-                integrated_color += color * a2 / alpha;*/
-
                 color = $cmap(val);
+                float a1 = integrated_color.a;
+                float a2 = color.a * density_factor * (1 - a1);
 
-                a1 = integrated_color.a;
-                a2 = val * density_factor * (1 - a1);
-
-                alpha = max(a1 + a2, 0.001);
+                float alpha = max(a1 + a2, 0.001);
 
                 integrated_color *= a1 / alpha;
                 integrated_color += color * a2 / alpha;
 
-            }
-            else{
-                // Case 2: Color is associated to redshift/velocity
-                if (u_color_method == 1) {
-                    color = $cmap(loc.y);
-                    a1 = integrated_color.a;
-                    a2 = val * density_factor * (1 - a1);
+                integrated_color.a = alpha;
 
-                    alpha = max(a1 + a2, 0.001);
-
-                    integrated_color *= a1 / alpha;
-                    integrated_color.rgb += color.rgb * a2 / alpha;
-                }
-                // Case 3: Color is associated to RGB cube
-                else {
-                    if (u_color_method == 2){
-                        color.r = loc.y;
-                        color.g = loc.z;
-                        color.b = loc.x;
-                        a1 = integrated_color.a;
-                        a2 = val * density_factor * (1 - a1);
-
-                        alpha = max(a1 + a2, 0.001);
-
-                        integrated_color *= a1 / alpha;
-                        integrated_color.rgb += color.rgb * a2 / alpha;
-                    }
-                    // Case 4: Mom2
-                    // TODO: Finish implementation of mom2 (not correct in its present form).
-                    else {
-                        // mom0
-                        a1 = mom0;
-                        a2 = val * density_factor * (1 - a1);
-
-                        alpha = max(a1 + a2, 0.001);
-
-                        mom0 *= a1 / alpha;
-                        mom0 += val * a2 / alpha;
-
-                        // mom1
-                        a1 = mom1;
-                        a2 = val * density_factor * (1 - a1);
-
-                        alpha = max(a1 + a2, 0.001);
-
-                        mom1 *= a1 / alpha;
-                        mom1 += loc.y * a2 / alpha;
-                    }
+                if( alpha > 0.99 ){
+                    // stop integrating if the fragment becomes opaque
+                    iter = nsteps;
                 }
             }
+            // Color is associated to redshift/velocity
+            else {
+                color = $cmap(loc.y);
+                float a1 = integrated_color.a;
+                float a2 = val * density_factor * (1 - a1);
 
-            integrated_color.a = alpha;
+                float alpha = max(a1 + a2, 0.001);
 
-            // stop integrating if the fragment becomes opaque
-            if( alpha > 0.99 ){
-                iter = nsteps;
-            }
+                integrated_color *= a1 / alpha;
+                integrated_color.rgb += color.rgb * a2 / alpha;
 
-        """,
-    after_loop="""
+                integrated_color.a = alpha;
 
-        if (u_color_method != 3){
-            gl_FragColor = integrated_color;
-        }
-        else {
-            gl_FragColor = $cmap((mom0  * (mom0-mom1 * mom0-mom1)) / mom0);
-        }
-        """,
-)
-TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format(**TRANSLUCENT_SNIPPETS)
-
-TRANSLUCENT2_SNIPPETS = dict(
-    before_loop="""
-        vec4 integrated_color = vec4(0., 0., 0., 0.);
-        float ratio = 1/nsteps; // final average
-        """,
-    in_loop="""
-            float alpha;
-            // Case 1: Color is associated to voxel intensity
-            if (u_color_method == 0) {
-                color = $cmap(val);
-                integrated_color = (val * density_factor + integrated_color.a * (1 - density_factor)) * color;
-                alpha = integrated_color.a;
-
-                //alpha = a1+a2;
-                // integrated_color *= a1 / alpha;
-                // integrated_color += color * a2 / alpha;
-            }
-            else{
-                // Case 2: Color is associated to redshift/velocity
-                if (u_color_method == 1) {
-                    color = $cmap(loc.y);
-                    float a1 = integrated_color.a;
-                    float a2 = val * density_factor * (1 - a1);
-
-                    alpha = max(a1 + a2, 0.001);
-
-                    integrated_color *= a1 / alpha;
-                    integrated_color.rgb += color.rgb * a2 / alpha;
+                if( alpha > 0.99 ){
+                    // stop integrating if the fragment becomes opaque
+                    iter = nsteps;
                 }
-                // Case 3: Color is associated to RGB cube
-                else {
-                    color.r = loc.x;
-                    color.g = loc.z;
-                    color.b = loc.y;
-                    float a1 = integrated_color.a;
-                    float a2 = val * density_factor * (1 - a1);
-
-                    alpha = max(a1 + a2, 0.001);
-
-                    integrated_color *= a1 / alpha;
-                    integrated_color.rgb += color.rgb * a2 / alpha;
-                }
-            }
-
-            integrated_color.a = alpha;
-
-            // stop integrating if the fragment becomes opaque
-            if( alpha > 0.99 ){
-                iter = nsteps;
             }
 
         """,
@@ -757,9 +535,7 @@ TRANSLUCENT2_SNIPPETS = dict(
         gl_FragColor = integrated_color;
         """,
 )
-TRANSLUCENT2_FRAG_SHADER = FRAG_SHADER.format(**TRANSLUCENT2_SNIPPETS)
-
-
+TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format(**TRANSLUCENT_SNIPPETS)
 
 ADDITIVE_SNIPPETS = dict(
     before_loop="""
@@ -775,7 +551,6 @@ ADDITIVE_SNIPPETS = dict(
         """,
 )
 ADDITIVE_FRAG_SHADER = FRAG_SHADER.format(**ADDITIVE_SNIPPETS)
-
 
 ISO_SNIPPETS = dict(
     before_loop="""
@@ -809,10 +584,10 @@ frag_dict = {
     'mip': MIP_FRAG_SHADER,
     'lmip': LMIP_FRAG_SHADER,
     'iso': ISO_FRAG_SHADER,
-    'wsp': TRANSLUCENT_FRAG_SHADER,
-    'translucent2': TRANSLUCENT2_FRAG_SHADER,
+    'translucent': TRANSLUCENT_FRAG_SHADER,
     'additive': ADDITIVE_FRAG_SHADER,
 }
+
 
 # _interpolation_template = """
 #     #include "misc/spatial-filters.frag"
@@ -836,7 +611,7 @@ frag_dict = {
 
 class RenderVolumeVisual(Visual):
     """ Displays a 3D Volume
-    
+
     Parameters
     ----------
     vol : ndarray
@@ -845,7 +620,7 @@ class RenderVolumeVisual(Visual):
         The contrast limits. The values in the volume are mapped to
         black and white corresponding to these values. Default maps
         between min and max.
-    method : {'mip', 'wsp', 'additive', 'iso'}
+    method : {'mip', 'translucent', 'additive', 'iso'}
         The render method to use. See corresponding docs for details.
         Default 'mip'.
     threshold : float
@@ -862,12 +637,11 @@ class RenderVolumeVisual(Visual):
         but has lower performance on desktop platforms.
     """
 
-    def __init__(self, vol, clim=None, method='mip', threshold=None, 
+    def __init__(self, vol, clim=None, method='mip', threshold=None,
                  relative_step_size=0.8, cmap='grays',
                  emulate_texture=False, color_scale='linear',
-                 filter_type = 0, filter_size = 1,
-                 use_gaussian_filter = False, gaussian_filter_size=9,
-                 density_factor=0.01, color_method='Moment 0', log_scale=0,
+                 filter_size=1, use_gaussian_filter=0, gaussian_filter_size=9,
+                 density_factor=0.01, color_method='voxel',
                  interpolation='linear'):
 
         tex_cls = TextureEmulated3D if emulate_texture else Texture3D
@@ -953,17 +727,15 @@ class RenderVolumeVisual(Visual):
         # Set params
         self.method = method
         self.relative_step_size = relative_step_size
-        #self.color_scale = color_scale
+        # self.color_scale = color_scale
         # self.data_min = self._clim[0]
         # self.data_max = self._clim[1]
 
         # moving_box_filter (=1 means no filter)
-        self.filter_type = filter_type
         self.filter_size = filter_size
         # 3D gaussian filter
         self.use_gaussian_filter = use_gaussian_filter
         self.gaussian_filter_size = gaussian_filter_size
-        self.log_scale = log_scale
         self.density_factor = density_factor
         self.color_method = color_method
 
@@ -1009,7 +781,6 @@ class RenderVolumeVisual(Visual):
         if np.isnan(vol).any():
             vol = np.nan_to_num(vol)
 
-        self.high_discard_filter_value = self._clim[1]
         self.low_discard_filter_value = self._clim[0]
 
         # self.volume_mean = np.mean(vol)
@@ -1020,9 +791,6 @@ class RenderVolumeVisual(Visual):
         self._tex.set_data(vol)  # will be efficient if vol is same shape
         self.shared_program['u_shape'] = (vol.shape[2], vol.shape[1],
                                           vol.shape[0])
-
-        self.shared_program['u_resolution'] = (1/vol.shape[2], 1/vol.shape[1],
-                                          1/vol.shape[0])
 
         shape = vol.shape[:3]
         if self._vol_shape != shape:
@@ -1067,7 +835,7 @@ class RenderVolumeVisual(Visual):
 
         Current options are:
 
-            * wsp: voxel colors are blended along the view ray until
+            * translucent: voxel colors are blended along the view ray until
               the result is opaque.
             * mip: maxiumum intensity projection. Cast a ray and display the
               maximum value that was encountered.
@@ -1111,14 +879,10 @@ class RenderVolumeVisual(Visual):
 
     @color_method.setter
     def color_method(self, color_method):
-        if color_method == 'Moment 0':
+        if color_method == 'voxel':
             self._color_method = 0
-        elif color_method == 'Moment 1':
-            self._color_method = 1
-        elif color_method == 'rgb_cube':
-            self._color_method = 2
         else:
-            self._color_method = 3
+            self._color_method = 1
 
         # print ("color_method", self._color_method)
         self.shared_program['u_color_method'] = int(self._color_method)
@@ -1151,16 +915,6 @@ class RenderVolumeVisual(Visual):
             self._color_scale = 1
 
         self.shared_program['u_color_scale'] = int(self._color_scale)
-        self.update()
-
-    @property
-    def log_scale(self):
-        return self._log_scale
-
-    @log_scale.setter
-    def log_scale(self, log_scale):
-        self._log_scale = int(log_scale)
-        #self.shared_program['u_log_scale'] = int(self._log_scale)
         self.update()
 
     @property
@@ -1240,22 +994,8 @@ class RenderVolumeVisual(Visual):
     def filter_size(self, filter_size):
         self._filter_size = int(filter_size)
         self.shared_program['u_filter_size'] = int(self._filter_size)
-        self.shared_program['u_filter_arm'] = int(np.floor(self._filter_size/2))
-        self.shared_program['u_filter_coeff'] = float(1/self._filter_size)
-        self.update()
-
-    @property
-    def filter_type(self):
-        return self._filter_type
-
-    @filter_type.setter
-    def filter_type(self, filter_type):
-        if filter_type == 'Rescale':
-            self._filter_type = 1
-        else:
-            self._filter_type = 0
-
-        self.shared_program['u_filter_type'] = int(self._filter_type)
+        self.shared_program['u_filter_arm'] = int(np.floor(self._filter_size / 2))
+        self.shared_program['u_filter_coeff'] = float(1 / self._filter_size)
         self.update()
 
     @property
@@ -1264,7 +1004,8 @@ class RenderVolumeVisual(Visual):
 
     @use_gaussian_filter.setter
     def use_gaussian_filter(self, use_gaussian_filter):
-        print ("use_gaussian_filter", use_gaussian_filter)
+        print
+        "use_gaussian_filter", use_gaussian_filter
         self._use_gaussian_filter = int(use_gaussian_filter)
         self.shared_program['u_use_gaussian_filter'] = int(self._use_gaussian_filter)
         self.update()
@@ -1280,20 +1021,6 @@ class RenderVolumeVisual(Visual):
         self.update()
 
     @property
-    def high_discard_filter_value(self):
-        return self._high_discard_filter_value
-
-    @high_discard_filter_value.setter
-    def high_discard_filter_value(self, high_discard_filter_value):
-        self._high_discard_filter_value = float(high_discard_filter_value)
-        self._high_discard_filter_value -= self._clim[0]
-        self._high_discard_filter_value /= self._clim[1] - self._clim[0]
-
-        self.shared_program['u_high_discard_filter_value'] = self._high_discard_filter_value
-
-        self.update()
-
-    @property
     def low_discard_filter_value(self):
         return self._low_discard_filter_value
 
@@ -1306,7 +1033,7 @@ class RenderVolumeVisual(Visual):
         self.shared_program['u_low_discard_filter_value'] = self._low_discard_filter_value
 
         self.update()
-        
+
     @property
     def density_factor(self):
         return self._density_factor
@@ -1322,14 +1049,14 @@ class RenderVolumeVisual(Visual):
     @property
     def relative_step_size(self):
         """ The relative step size used during raycasting.
-        
+
         Larger values yield higher performance at reduced quality. If
         set > 2.0 the ray skips entire voxels. Recommended values are
         between 0.5 and 1.5. The amount of quality degradation depends
         on the render method.
         """
         return self._relative_step_size
-    
+
     @relative_step_size.setter
     def relative_step_size(self, value):
         value = float(value)
@@ -1340,12 +1067,12 @@ class RenderVolumeVisual(Visual):
 
     def _create_vertex_data(self):
         """ Create and set positions and texture coords from the given shape
-        
+
         We have six faces with 1 quad (2 triangles) each, resulting in
         6*2*3 = 36 vertices in total.
         """
         shape = self._vol_shape
-        
+
         # Get corner coordinates. The -0.5 offset is to center
         # pixels/voxels. This works correctly for anisotropic data.
         x0, x1 = -0.5, shape[2] - 0.5
@@ -1372,12 +1099,12 @@ class RenderVolumeVisual(Visual):
         |/      |/
         0-------1
         """
-        
+
         # Order is chosen such that normals face outward; front faces will be
         # culled.
         indices = np.array([2, 6, 0, 4, 5, 6, 7, 2, 3, 0, 1, 5, 3, 7],
                            dtype=np.uint32)
-        
+
         # Apply
         self._vertices.set_data(pos)
         self._index_buffer.set_data(indices)
@@ -1402,7 +1129,9 @@ class RenderVolumeVisual(Visual):
         # As defined in Whiting, M. T. "DUCHAMP: a 3D source finder for spectral-lines data", MNRAS, 2012.
         return np.median(volume - np.median(volume)) * 1.4826042
 
-RenderVolume = create_visual_node(RenderVolumeVisual)
+
+RenderVolumePyQt4 = create_visual_node(RenderVolumeVisual)
+
 
 def get_interpolation_fun():
     return get_interpolation_fun()

@@ -4,31 +4,45 @@ from __future__ import division
 # Basic imports
 import sys
 import numpy as np
-import time
 
 # Vispy imports
-from extern.vispy import app, scene, io
-from extern.vispy.color import get_colormaps
+from extern.vispy import scene, plot, io
+from extern.vispy.color import get_colormaps, BaseColormap
+from extern.vispy import gloo
+
+# from vispy.geometry import create_cube
 from shades import RenderVolume
 
 # Astropy imports
+from astropy import wcs
 from astropy.io import fits
 
-# PyQt5 imports
-from PyQt5 import QtGui, QtCore, QtWidgets
+# Window related
+try:
+    from sip import setapi
 
-class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, resolution):
-        QtWidgets.QMainWindow.__init__(self)
+    setapi("QVariant", 2)
+    setapi("QString", 2)
+except ImportError:
+    pass
+
+from PyQt4 import QtGui, QtCore
+
+
+# gloo.gl.use_gl('gl2 debug')
+
+class MainWindow(QtGui.QMainWindow):
+    def __init__(self):
+        QtGui.QMainWindow.__init__(self)
 
         # self.resize(1800, 1000)
-        self.resize(resolution.width(), resolution.height())
-        self.setWindowTitle('Shwirl')
+        self.resize(800, 600)
+        self.setWindowTitle('Shaded Astro Data Cube')
 
-        splitter_h = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        splitter_v = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        splitter_h = QtGui.QSplitter(QtCore.Qt.Horizontal)
+        splitter_v = QtGui.QSplitter(QtCore.Qt.Vertical)
 
-        self.Canvas3D = Canvas3D(resolution)
+        self.Canvas3D = Canvas3D()
         self.Canvas3D.create_native()
         self.Canvas3D.native.setParent(self)
 
@@ -43,25 +57,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # splitter_h.addWidget(splitter_v)
 
         # Menus / viz options
-        self.widget_types = ['load_button', 'view', 'rendering_params', 'transform', 'smoothing', 'filtering', 'image']
-        self.widget_types_text = {'load_button': 'Data',
-                                  'view': 'View',
-                                  'rendering_params': 'Colouring',
-                                  'transform': 'Axes stretch',
-                                  'smoothing': 'Smooth data',
-                                  'filtering': 'Filter data',
-                                  'image': 'Export'}
-
-        self.props = {}
-        toolbox = QtWidgets.QToolBox()
-        for type in self.widget_types:
-            self.props[type] = ObjectWidget(type)
-            toolbox.addItem(self.props[type], self.widget_types_text[type])
-
-        splitter_v.addWidget(toolbox)
-
-        # toolbox.addItem(self.fits_infos, 'FITS metadata')
-        # splitter_v.addWidget(self.props)
+        self.props = ObjectWidget()
+        splitter_v.addWidget(self.props)
 
         # FITS metadata
         self.fits_infos = FitsMetaWidget()
@@ -71,110 +68,66 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(splitter_h)
 
         # Connect signals (events handling)
-        self.props['load_button'].signal_file_loaded.connect(self.load_volume)
-
-        # self.props['load_button'].signal_objet_changed.connect(self.update_rendering_param)
-        self.props['view'].signal_objet_changed.connect(self.update_rendering_param)
-        self.props['rendering_params'].signal_objet_changed.connect(self.update_rendering_param)
-
-        # self.props['load_button'].signal_camera_changed.connect(self.update_view)
-        self.props['view'].signal_camera_changed.connect(self.update_view)
-        self.props['view'].signal_fov_changed.connect(self.update_fov)
-
-        self.props['view'].signal_autorotate_changed.connect(self.update_autorotate)
-        # self.props['view'].signal_log_scale_changed.connect(self.update_log_scale)
-        self.props['transform'].signal_scaling_changed.connect(self.update_scaling)
-        self.props['rendering_params'].signal_threshold_changed.connect(self.update_threshold)
-        self.props['rendering_params'].signal_density_factor_changed.connect(self.update_density_factor)
+        self.props.signal_file_loaded.connect(self.load_volume)
+        self.props.signal_objet_changed.connect(self.update_view)
+        self.props.signal_camera_changed.connect(self.update_camera)
+        self.props.signal_scaling_changed.connect(self.update_scaling)
+        self.props.signal_threshold_changed.connect(self.update_threshold)
         # self.props.signal_color_scale_changed.connect(self.update_color_scale)
-        self.props['smoothing'].signal_filter_size_changed.connect(self.update_filter_size)
-        self.props['filtering'].signal_filter_type_changed.connect(self.signal_filter_type)
-        self.props['filtering'].signal_high_discard_filter_changed.connect(self.update_high_discard_filter)
-        self.props['filtering'].signal_low_discard_filter_changed.connect(self.update_low_discard_filter)
-        self.props['image'].signal_export_image.connect(self.export_image)
+        self.props.signal_filter_size_changed.connect(self.update_filter_size)
+        self.props.signal_low_discard_filter_changed.connect(self.update_low_discard_filter)
+        self.props.signal_density_factor_changed.connect(self.update_density_factor)
+        self.props.signal_export_image.connect(self.export_image)
 
-        QtWidgets.QApplication.setStyle(QtWidgets.QStyleFactory.create('Cleanlooks'))
+        QtGui.QApplication.setStyle(QtGui.QStyleFactory.create('Cleanlooks'))
 
     def load_volume(self):
-        self.Canvas3D.set_volume_scene(self.props['load_button'].loaded_cube)
-        self.fits_infos.print_header(self.props['load_button'].loaded_cube[0].header)
-
-        for type in self.widget_types:
-            self.props[type].update_discard_filter_text(self.props['load_button'].vol_min,
-                                                        self.props['load_button'].vol_max)
-            self.props[type].enable_widgets()
-            # self.Canvas2D.set_histogram(self.props.loaded_cube)
-
-            self.update_rendering_param()
-            self.update_view()
-
-    def update_rendering_param(self):
-        # tf_method, cmap
-        self.Canvas3D.set_data(self.props['rendering_params'].combo_tf_method.currentText(),
-                               self.props['rendering_params'].combo_cmap.currentText(),
-                               self.props['rendering_params'].combo_color_method.currentText(),
-                               self.props['rendering_params'].combo_interpolation_method.currentText())
-
-        if self.props['rendering_params'].combo_tf_method.currentText() == 'lmip':
-            print("thres", self.props['rendering_params'].l_threshold_value.text())
-            # self.update_threshold(self.props.l_threshold_value.text())
-            self.update_threshold()
+        self.Canvas3D.set_volume_scene(self.props.loaded_cube)
+        self.fits_infos.print_header(self.props.loaded_cube[0].header)
+        # self.Canvas2D.set_histogram(self.props.loaded_cube)
 
     def update_view(self):
-        self.Canvas3D.set_camera(self.props['view'].combo_camera.currentText(),
-                                 self.props['view'].slider_fov.value())
+        # vr_method, cmap
+        self.Canvas3D.set_data(self.props.combo_vr_method.currentText(),
+                               self.props.combo_cmap.currentText(),
+                               self.props.combo_color_method.currentText(),
+                               self.props.combo_interpolation_method.currentText())
 
-    def update_fov(self):
-        self.Canvas3D.set_fov(self.props['view'].slider_fov.value())
+        if self.props.combo_vr_method.currentText() == 'lmip':
+            self.update_threshold(self.props.l_threshold_value.text())
 
-    def update_autorotate(self):
-        self.Canvas3D.set_autorotate(self.props['view'].chk_autorotate.isChecked())
-
-    # def update_log_scale(self):
-    #     self.Canvas3D.set_log_scale(self.props['view'].chk_log_scale.isChecked())
+    def update_camera(self):
+        self.Canvas3D.set_camera(self.props.combo_camera.currentText(),
+                                 self.props.slider_fov.value())
 
     def update_scaling(self):
-        self.Canvas3D.set_scaling(self.props['transform'].slider_scalex.value(),
-                                  self.props['transform'].slider_scaley.value(),
-                                  self.props['transform'].slider_scalez.value())
+        self.Canvas3D.set_scaling(self.props.slider_scalex.value(),
+                                  self.props.slider_scaley.value(),
+                                  self.props.slider_scalez.value())
 
     def update_threshold(self):
-        self.Canvas3D.set_threshold(self.props['rendering_params'].l_threshold_value.text())
+        self.Canvas3D.set_threshold(self.props.l_threshold_value.text())
 
     def update_color_scale(self):
-        self.Canvas3D.set_color_scale(self.props['rendering_params'].combo_color_scale.currentText())
-
-    def update_density_factor(self):
-        self.Canvas3D.set_density_factor(self.props['rendering_params'].l_density_factor_value.text())
+        self.Canvas3D.set_color_scale(self.props.combo_color_scale.currentText())
 
     def update_filter_size(self):
-        self.Canvas3D.set_filter_size(self.props['smoothing'].l_filter_size_value.text())
-        self.Canvas3D.set_gaussian_filter(self.props['smoothing'].chk_use_gaussian_filter.isChecked(),
-                                          self.props['smoothing'].combo_gaussian_filter_size.currentText())
-
-    def signal_filter_type(self):
-        self.Canvas3D.set_filter_type(self.props['filtering'].combo_filter_type.currentText())
-
-    def update_high_discard_filter(self):
-        self.Canvas3D.set_high_discard_filter(self.props['filtering'].l_high_discard_filter_value.text(),
-                                              self.props['filtering'].high_scaled_value,
-                                              self.props['filtering'].combo_filter_type.currentText())
+        self.Canvas3D.set_filter_size(self.props.l_filter_size_value.text())
+        self.Canvas3D.set_gaussian_filter(self.props.combo_use_gaussian_filter.currentText(),
+                                          self.props.combo_gaussian_filter_size.currentText())
 
     def update_low_discard_filter(self):
-        self.Canvas3D.set_low_discard_filter(self.props['filtering'].l_low_discard_filter_value.text(),
-                                             self.props['filtering'].low_scaled_value,
-                                             self.props['filtering'].combo_filter_type.currentText())
+        self.Canvas3D.set_low_discard_filter(self.props.l_low_discard_filter_value.text())
+
+    def update_density_factor(self):
+        self.Canvas3D.set_density_factor(self.props.l_density_factor_value.text())
 
     def export_image(self):
-        fileName = QtWidgets.QFileDialog.getSaveFileName(self,
-                                                         'Save still image',
-                                                         filter='Images (*.png)')
-        if fileName[0] != '':
-            img = self.Canvas3D.render()
-            io.write_png(fileName[0], img)
+        img = self.Canvas3D.render()
+        io.write_png('images/image.png', img)
 
 
-class FitsMetaWidget(QtWidgets.QWidget):
+class FitsMetaWidget(QtGui.QWidget):
     """
     Widget for editing Volume parameters
     """
@@ -184,21 +137,21 @@ class FitsMetaWidget(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super(FitsMetaWidget, self).__init__(parent)
 
-        l_title = QtWidgets.QLabel("Fits Primary Header")
+        l_title = QtGui.QLabel("Fits Primary Header")
 
-        self.l_header = QtWidgets.QTextEdit("No fits loaded ")
+        self.l_header = QtGui.QTextEdit("No fits loaded ")
         self.l_header.setReadOnly(True)
 
         font = self.l_header.font()
         font.setFamily("Avenir")
         font.setPointSize(12)
 
-        gbox = QtWidgets.QGridLayout()
+        gbox = QtGui.QGridLayout()
         # ------ Adding Widgets
         gbox.addWidget(l_title, 0, 1)
         gbox.addWidget(self.l_header, 1, 1)
 
-        vbox = QtWidgets.QVBoxLayout()
+        vbox = QtGui.QVBoxLayout()
         vbox.addLayout(gbox)
         vbox.addStretch(1.0)
 
@@ -219,299 +172,225 @@ class FitsMetaWidget(QtWidgets.QWidget):
         sb.setValue(sb.maximum())
 
 
-class ObjectWidget(QtWidgets.QWidget):
+class ObjectWidget(QtGui.QWidget):
     """
     Widget for editing Volume parameters
     """
     signal_objet_changed = QtCore.pyqtSignal(name='objectChanged')
     signal_file_loaded = QtCore.pyqtSignal(name='fileLoaded')
     signal_camera_changed = QtCore.pyqtSignal(name='cameraChanged')
-    signal_fov_changed = QtCore.pyqtSignal(name='fovChanged')
-    signal_autorotate_changed = QtCore.pyqtSignal(name='autorotateChanged')
-    # signal_log_scale_changed = QtCore.pyqtSignal(name='log_scaleChanged')
     signal_scaling_changed = QtCore.pyqtSignal(name='scalingChanged')
     signal_threshold_changed = QtCore.pyqtSignal(name='thresholdChanged')
     signal_color_scale_changed = QtCore.pyqtSignal(name='color_scaleChanged')
     signal_filter_size_changed = QtCore.pyqtSignal(name='filter_sizeChanged')
-    signal_filter_type_changed = QtCore.pyqtSignal(name='filter_typeChanged')
-    signal_high_discard_filter_changed = QtCore.pyqtSignal(name='high_discard_filterChanged')
     signal_low_discard_filter_changed = QtCore.pyqtSignal(name='low_discard_filterChanged')
     signal_density_factor_changed = QtCore.pyqtSignal(name='density_factorChanged')
     signal_export_image = QtCore.pyqtSignal(name='export_image')
 
-    def __init__(self, type, parent=None):
+    def __init__(self, parent=None):
         super(ObjectWidget, self).__init__(parent)
 
         self.loaded_cube = None
 
         self.widgets_array = []
         self.widgets_dict = {}
-        self.widgets_group_dict = {}
-        self.widgets_group_array = []
 
-        def serialize_widgets(key, group, array):
+        def serialize_widgets(key, array):
             self.widgets_array.append(array)
             self.widgets_dict[key] = array
-            try:
-                self.widgets_group_dict[group].append([key, array])
-            except:
-                self.widgets_group_array.append(group)
-                self.widgets_group_dict[group] = []
-                self.widgets_group_dict[group].append([key, array])
 
-        if type == 'load_button':
-            self.load_button = QtWidgets.QPushButton("Load FITS", self)
-            self.load_button.clicked.connect(self.showDialog)
-            array = [self.load_button]
-            serialize_widgets('fits_button', 'Data', array)
+        self.load_button = QtGui.QPushButton("Load FITS", self)
+        self.load_button.clicked.connect(self.showDialog)
+        array = [self.load_button]
+        serialize_widgets('fits_button', array)
 
-        elif type == 'view':
-            l_cam = QtWidgets.QLabel("camera ")
-            self.camera = ['Turntable', 'Fly', 'Arcball']  # 'Perspectivecamera',
-            self.combo_camera = QtWidgets.QComboBox(self)
-            self.combo_camera.addItems(self.camera)
-            self.combo_camera.currentIndexChanged.connect(self.update_view)
-            array = [l_cam, self.combo_camera]
-            serialize_widgets('camera', 'Point of view', array)
+        l_cam = QtGui.QLabel("Camera ")
+        self.camera = ['Turntable', 'Fly', 'Arcball']  # 'PerspectiveCamera',
+        self.combo_camera = QtGui.QComboBox(self)
+        self.combo_camera.addItems(self.camera)
+        self.combo_camera.currentIndexChanged.connect(self.update_camera)
+        array = [l_cam, self.combo_camera]
+        serialize_widgets('camera', array)
 
-            self.chk_autorotate = QtWidgets.QCheckBox("Autorotate")
-            self.chk_autorotate.setChecked(False)
-            self.chk_autorotate.stateChanged.connect(self.update_autorotate)
-            array = [self.chk_autorotate]
-            serialize_widgets('autorotate', 'Point of view', array)
+        l_fov = QtGui.QLabel("Field of View ")
+        self.slider_fov = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.slider_fov.setMinimum(0)
+        self.slider_fov.setMaximum(160)
+        self.slider_fov.setValue(60)
+        self.slider_fov.setTickInterval(5)
+        self.l_fov_value = QtGui.QLineEdit(str(self.slider_fov.value()))
+        self.slider_fov.valueChanged.connect(self.update_camera)
+        array = [l_fov, self.slider_fov, self.l_fov_value]
+        serialize_widgets('field_of_view', array)
 
-            # self.chk_log_scale = QtWidgets.QCheckBox("Log scale")
-            # self.chk_log_scale.setChecked(False)
-            # self.chk_log_scale.stateChanged.connect(self.update_log_scale)
-            # array = [self.chk_log_scale]
-            # serialize_widgets('log_scale', array)
+        l_vr_method = QtGui.QLabel("VR method ")
+        # self.l_vr_method = ['mip', 'translucent', 'iso', 'additive']
+        self.vr_method = ['mip', 'lmip', 'translucent', 'MeanIP', 'iso']
+        self.combo_vr_method = QtGui.QComboBox(self)
+        self.combo_vr_method.addItems(self.vr_method)
+        self.combo_vr_method.currentIndexChanged.connect(self.update_param)
+        array = [l_vr_method, self.combo_vr_method]
+        serialize_widgets('vr_method', array)
 
-            l_fov = QtWidgets.QLabel("Field of View ")
-            self.slider_fov = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_fov.setMinimum(0)
-            self.slider_fov.setMaximum(160)
-            self.slider_fov.setValue(60)
-            self.slider_fov.setTickInterval(5)
-            self.l_fov_value = QtWidgets.QLineEdit(str(self.slider_fov.value()))
-            self.slider_fov.valueChanged.connect(self.update_fov)
-            array = [l_fov, self.slider_fov, self.l_fov_value]
-            serialize_widgets('field_of_view', 'Point of view', array)
+        l_density_factor = QtGui.QLabel("Density regulator ")
+        self.slider_density_factor = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.slider_density_factor.setMinimum(0)
+        self.slider_density_factor.setMaximum(10000)
+        self.slider_density_factor.setValue(10000)
+        self.l_density_factor_value = QtGui.QLineEdit(str(1))
+        self.slider_density_factor.valueChanged.connect(self.update_density_factor)
+        array = [l_density_factor, self.slider_density_factor, self.l_density_factor_value]
+        serialize_widgets('density_factor', array)
 
-        elif type == 'rendering_params':
-            l_tf_method = QtWidgets.QLabel("Transfer function ")
-            # self.l_tf_method = ['mip', 'translucent', 'translucent2', 'iso', 'additive']
-            self.tf_method = ['mip', 'lmip', 'wsp', 'iso']
-            self.combo_tf_method = QtWidgets.QComboBox(self)
-            self.combo_tf_method.addItems(self.tf_method)
-            self.combo_tf_method.currentIndexChanged.connect(self.update_param)
-            array = [l_tf_method, self.combo_tf_method]
-            serialize_widgets('tf_method', 'Rendering parameters', array)
+        l_color_method = QtGui.QLabel("Color method ")
+        self.color_method = ['voxel', 'velocity/redshift']
+        self.combo_color_method = QtGui.QComboBox(self)
+        self.combo_color_method.addItems(self.color_method)
+        self.combo_color_method.currentIndexChanged.connect(self.update_param)
+        array = [l_color_method, self.combo_color_method]
+        serialize_widgets('color_method', array)
 
-            l_density_factor = QtWidgets.QLabel("Density regulator ")
-            self.slider_density_factor = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_density_factor.setMinimum(0)
-            self.slider_density_factor.setMaximum(10000)
-            self.slider_density_factor.setValue(0)
-            self.l_density_factor_value = QtWidgets.QLineEdit(str(1))
-            self.slider_density_factor.valueChanged.connect(self.update_density_factor)
-            array = [l_density_factor, self.slider_density_factor, self.l_density_factor_value]
-            serialize_widgets('density_factor', 'Rendering parameters', array)
-            for widget in self.widgets_dict['density_factor']:
-                widget.hide()
+        l_threshold = QtGui.QLabel("Threshold ")
+        self.slider_threshold = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.slider_threshold.setMinimum(0)
+        self.slider_threshold.setMaximum(10000)
+        self.slider_threshold.setValue(10000)
+        self.l_threshold_value = QtGui.QLineEdit(str(self.slider_threshold.value()))
+        self.slider_threshold.valueChanged.connect(self.update_threshold)
+        array = [l_threshold, self.slider_threshold, self.l_threshold_value]
+        serialize_widgets('threshold', array)
 
-            l_color_method = QtWidgets.QLabel("Colour method ")
-            self.color_method = ['Moment 0', 'Moment 1', 'rgb_cube']
-            self.combo_color_method = QtWidgets.QComboBox(self)
-            self.combo_color_method.addItems(self.color_method)
-            self.combo_color_method.currentIndexChanged.connect(self.update_param)
-            array = [l_color_method, self.combo_color_method]
-            serialize_widgets('color_method', 'Rendering parameters', array)
+        l_interpolation_method = QtGui.QLabel("Interpolation method ")
+        self.interpolation_method = ['linear', 'nearest']  # ,
+        # 'bilinear', 'hanning', 'hamming', 'hermite',
+        # 'kaiser', 'quadric', 'bicubic', 'catrom',
+        # 'mitchell', 'spline16', 'spline36', 'gaussian',
+        # 'bessel', 'sinc', 'lanczos', 'blackman']
+        self.combo_interpolation_method = QtGui.QComboBox(self)
+        self.combo_interpolation_method.addItems(self.interpolation_method)
+        self.combo_interpolation_method.currentIndexChanged.connect(self.update_param)
+        array = [l_interpolation_method, self.combo_interpolation_method]
+        serialize_widgets('interpolation_method', array)
 
-            l_threshold = QtWidgets.QLabel("Threshold ")
-            self.slider_threshold = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_threshold.setMinimum(0)
-            self.slider_threshold.setMaximum(10000)
-            self.slider_threshold.setValue(10000)
-            self.l_threshold_value = QtWidgets.QLineEdit(str(self.slider_threshold.value()))
-            self.slider_threshold.valueChanged.connect(self.update_threshold)
-            array = [l_threshold, self.slider_threshold, self.l_threshold_value]
-            serialize_widgets('threshold', 'Rendering parameters', array)
-            for widget in self.widgets_dict['threshold']:
-                widget.hide()
+        l_cmap = QtGui.QLabel("Cmap ")
+        self.cmap = list(get_colormaps().keys())
+        self.combo_cmap = QtGui.QComboBox(self)
+        self.combo_cmap.addItems(self.cmap)
+        self.combo_cmap.currentIndexChanged.connect(self.update_param)
+        array = [l_cmap, self.combo_cmap]
+        serialize_widgets('cmap', array)
 
-            l_interpolation_method = QtWidgets.QLabel("Interpolation method ")
-            self.interpolation_method = ['linear', 'nearest']  # ,
-            # 'bilinear', 'hanning', 'hamming', 'hermite',
-            # 'kaiser', 'quadric', 'bicubic', 'catrom',
-            # 'mitchell', 'spline16', 'spline36', 'gaussian',
-            # 'bessel', 'sinc', 'lanczos', 'blackman']
-            self.combo_interpolation_method = QtWidgets.QComboBox(self)
-            self.combo_interpolation_method.addItems(self.interpolation_method)
-            self.combo_interpolation_method.currentIndexChanged.connect(self.update_param)
-            array = [l_interpolation_method, self.combo_interpolation_method]
-            serialize_widgets('interpolation_method', 'Rendering parameters', array)
-
-            l_cmap = QtWidgets.QLabel("Colour map ")
-            self.cmap = sorted(list(get_colormaps().keys()), key=str.lower)
-            self.combo_cmap = QtWidgets.QComboBox(self)
-            self.combo_cmap.addItems(self.cmap)
-            self.combo_cmap.currentIndexChanged.connect(self.update_param)
-            array = [l_cmap, self.combo_cmap]
-            serialize_widgets('cmap', 'Rendering parameters', array)
-
-        # l_color_scale = QtWidgets.QLabel("Color scale ")
+        # l_color_scale = QtGui.QLabel("Color scale ")
         # self.color_scale = ['linear', 'log', 'exp']
-        # self.combo_color_scale = QtWidgets.QComboBox(self)
+        # self.combo_color_scale = QtGui.QComboBox(self)
         # self.combo_color_scale.addItems(self.color_scale)
         # self.combo_color_scale.currentIndexChanged.connect(self.update_color_scale)
         # array = [l_color_scale, self.combo_color_scale]
         # serialize_widgets('color_scale', array)
 
-        elif type == 'transform':
-            l_scalex = QtWidgets.QLabel("Scale X ")
-            self.slider_scalex = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_scalex.setMinimum(1)
-            self.slider_scalex.setMaximum(20)
-            self.slider_scalex.setValue(1)
-            self.slider_scalex.setTickInterval(1)
-            self.l_scalex_value = QtWidgets.QLineEdit(str(self.slider_scalex.value()))
-            self.slider_scalex.valueChanged.connect(self.update_scaling)
-            array = [l_scalex, self.slider_scalex, self.l_scalex_value]
-            serialize_widgets('scale_x', 'Transform', array)
+        l_scalex = QtGui.QLabel("Scale X ")
+        self.slider_scalex = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.slider_scalex.setMinimum(1)
+        self.slider_scalex.setMaximum(20)
+        self.slider_scalex.setValue(1)
+        self.slider_scalex.setTickInterval(1)
+        self.l_scalex_value = QtGui.QLineEdit(str(self.slider_scalex.value()))
+        self.slider_scalex.valueChanged.connect(self.update_scaling)
+        array = [l_scalex, self.slider_scalex, self.l_scalex_value]
+        serialize_widgets('scale_x', array)
 
-            l_scaley = QtWidgets.QLabel("Scale Y ")
-            self.slider_scaley = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_scaley.setMinimum(1)
-            self.slider_scaley.setMaximum(20)
-            self.slider_scaley.setValue(1)
-            self.slider_scaley.setTickInterval(1)
-            self.l_scaley_value = QtWidgets.QLineEdit(str(self.slider_scaley.value()))
-            self.slider_scaley.valueChanged.connect(self.update_scaling)
-            array = [l_scaley, self.slider_scaley, self.l_scaley_value]
-            serialize_widgets('scale_y', 'Transform', array)
+        l_scaley = QtGui.QLabel("Scale Y ")
+        self.slider_scaley = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.slider_scaley.setMinimum(1)
+        self.slider_scaley.setMaximum(20)
+        self.slider_scaley.setValue(1)
+        self.slider_scaley.setTickInterval(1)
+        self.l_scaley_value = QtGui.QLineEdit(str(self.slider_scaley.value()))
+        self.slider_scaley.valueChanged.connect(self.update_scaling)
+        array = [l_scaley, self.slider_scaley, self.l_scaley_value]
+        serialize_widgets('scale_y', array)
 
-            l_scalez = QtWidgets.QLabel("Scale Z ")
-            self.slider_scalez = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_scalez.setMinimum(1)
-            self.slider_scalez.setMaximum(20)
-            self.slider_scalez.setValue(1)
-            self.slider_scalez.setTickInterval(1)
-            self.l_scalez_value = QtWidgets.QLineEdit(str(self.slider_scalez.value()))
-            self.slider_scalez.valueChanged.connect(self.update_scaling)
-            array = [l_scalez, self.slider_scalez, self.l_scalez_value]
-            serialize_widgets('scale_z', 'Transform', array)
+        l_scalez = QtGui.QLabel("Scale Z ")
+        self.slider_scalez = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.slider_scalez.setMinimum(1)
+        self.slider_scalez.setMaximum(20)
+        self.slider_scalez.setValue(1)
+        self.slider_scalez.setTickInterval(1)
+        self.l_scalez_value = QtGui.QLineEdit(str(self.slider_scalez.value()))
+        self.slider_scalez.valueChanged.connect(self.update_scaling)
+        array = [l_scalez, self.slider_scalez, self.l_scalez_value]
+        serialize_widgets('scale_z', array)
 
-        elif type == 'smoothing':
-            l_filter_size = QtWidgets.QLabel("Box size ")
-            self.slider_filter_size = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_filter_size.setMinimum(0)
-            self.slider_filter_size.setMaximum(10)
-            self.slider_filter_size.setValue(0)
-            self.l_filter_size_value = QtWidgets.QLineEdit(str(self.slider_filter_size.value() + 1))
-            self.slider_filter_size.valueChanged.connect(self.update_filter_size)
-            array = [l_filter_size, self.slider_filter_size, self.l_filter_size_value]
-            serialize_widgets('filter_size', 'Smoothing', array)
+        l_filter_size = QtGui.QLabel("Filter size ")
+        self.slider_filter_size = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.slider_filter_size.setMinimum(0)
+        self.slider_filter_size.setMaximum(10)
+        self.slider_filter_size.setValue(0)
+        self.l_filter_size_value = QtGui.QLineEdit(str(self.slider_filter_size.value() + 1))
+        self.slider_filter_size.valueChanged.connect(self.update_filter_size)
+        array = [l_filter_size, self.slider_filter_size, self.l_filter_size_value]
+        serialize_widgets('filter_size', array)
 
-            # l_use_gaussian_filter = QtWidgets.QLabel("Activate Gaussian smoothing")
-            # self.use_gaussian_filter = ['0', '1']  # 'Perspectivecamera',
-            # self.combo_use_gaussian_filter = QtWidgets.QComboBox(self)
-            # self.combo_use_gaussian_filter.addItems(self.use_gaussian_filter)
-            # self.combo_use_gaussian_filter.currentIndexChanged.connect(self.update_gaussian_filter_size)
-            # array = [l_use_gaussian_filter, self.combo_use_gaussian_filter]
-            # serialize_widgets('use_gaussian_filter', array)
+        l_use_gaussian_filter = QtGui.QLabel("Activate Gaussian filter")
+        self.use_gaussian_filter = ['0', '1']  # 'PerspectiveCamera',
+        self.combo_use_gaussian_filter = QtGui.QComboBox(self)
+        self.combo_use_gaussian_filter.addItems(self.use_gaussian_filter)
+        self.combo_use_gaussian_filter.currentIndexChanged.connect(self.update_gaussian_filter_size)
+        array = [l_use_gaussian_filter, self.combo_use_gaussian_filter]
+        serialize_widgets('use_gaussian_filter', array)
 
-            l_gaussian_filter_size = QtWidgets.QLabel("Gaussian size ")
-            self.chk_use_gaussian_filter = QtWidgets.QCheckBox("Activate")
-            self.chk_use_gaussian_filter.setChecked(False)
-            self.chk_use_gaussian_filter.stateChanged.connect(self.update_gaussian_filter_size)
-            self.gaussian_filter_size = ['5', '9', '13']  # 'Perspectivecamera',
-            self.combo_gaussian_filter_size = QtWidgets.QComboBox(self)
-            self.combo_gaussian_filter_size.addItems(self.gaussian_filter_size)
-            self.combo_gaussian_filter_size.currentIndexChanged.connect(self.update_gaussian_filter_size)
-            array = [l_gaussian_filter_size, self.combo_gaussian_filter_size, self.chk_use_gaussian_filter]
-            serialize_widgets('gaussian_filter_size', 'Smoothing', array)
+        l_gaussian_filter_size = QtGui.QLabel("Gaussian filter size ")
+        self.gaussian_filter_size = ['5', '9', '13']  # 'PerspectiveCamera',
+        self.combo_gaussian_filter_size = QtGui.QComboBox(self)
+        self.combo_gaussian_filter_size.addItems(self.gaussian_filter_size)
+        self.combo_gaussian_filter_size.currentIndexChanged.connect(self.update_gaussian_filter_size)
+        array = [l_gaussian_filter_size, self.combo_gaussian_filter_size]
+        serialize_widgets('gaussian_filter_size', array)
 
-        elif type == 'filtering':
-            l_filter_type = QtWidgets.QLabel("Filter type")
-            self.filter_type = ['Filter out', 'Rescale']  # 'Perspectivecamera',
-            self.combo_filter_type = QtWidgets.QComboBox(self)
-            self.combo_filter_type.addItems(self.filter_type)
-            self.combo_filter_type.currentIndexChanged.connect(self.update_filter_type)
-            array = [l_filter_type, self.combo_filter_type]
-            serialize_widgets('filter_type', 'Filtering', array)
+        l_low_discard_filter = QtGui.QLabel("Low discard filter ")
+        self.slider_low_discard_filter = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.slider_low_discard_filter.setMinimum(0)
+        self.slider_low_discard_filter.setMaximum(10000)
+        self.slider_low_discard_filter.setValue(0)
+        self.l_low_discard_filter_value = QtGui.QLineEdit(str(self.slider_low_discard_filter.value()))
+        self.slider_low_discard_filter.valueChanged.connect(self.update_low_discard_filter)
+        array = [l_low_discard_filter, self.slider_low_discard_filter, self.l_low_discard_filter_value]
+        serialize_widgets('low_discard_filter', array)
 
-            l_high_discard_filter = QtWidgets.QLabel("high filter ")
-            self.slider_high_discard_filter = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_high_discard_filter.setMinimum(0)
-            self.slider_high_discard_filter.setMaximum(10000)
-            self.slider_high_discard_filter.setValue(10000)
-            self.l_high_discard_filter_value = QtWidgets.QLineEdit(str(self.slider_high_discard_filter.value()))
-            self.slider_high_discard_filter.valueChanged.connect(self.update_high_discard_filter)
-            array = [l_high_discard_filter, self.slider_high_discard_filter, self.l_high_discard_filter_value]
-            serialize_widgets('high_discard_filter', 'Filtering', array)
-            # for widget in self.widgets_dict['high_discard_filter']:
-            #     widget.hide()
+        self.export_image_button = QtGui.QPushButton("export_image", self)
+        self.export_image_button.clicked.connect(self.export_image)
+        array = [self.export_image_button]
+        serialize_widgets('export_image', array)
 
-            l_low_discard_filter = QtWidgets.QLabel("Low filter ")
-            self.slider_low_discard_filter = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-            self.slider_low_discard_filter.setMinimum(0)
-            self.slider_low_discard_filter.setMaximum(10000)
-            self.slider_low_discard_filter.setValue(0)
-            self.l_low_discard_filter_value = QtWidgets.QLineEdit(str(self.slider_low_discard_filter.value()))
-            self.slider_low_discard_filter.valueChanged.connect(self.update_low_discard_filter)
-            array = [l_low_discard_filter, self.slider_low_discard_filter, self.l_low_discard_filter_value]
-            serialize_widgets('low_discard_filter', 'Filtering', array)
+        gbox = QtGui.QGridLayout()
 
-        elif type == 'image':
-            self.export_image_button = QtWidgets.QPushButton("Save image to...", self)
-            self.export_image_button.clicked.connect(self.export_image)
-            array = [self.export_image_button]
-            serialize_widgets('export_image', 'Image', array)
-
-        # for group in self.widgets_group_array:
-        # groupboxes = []
-        # groupbox = QtWidgets.QGroupBox(group)
-
-
-        # Add widgets to the grid layout, which is added to the box, which is added to the group.
+        # Add widgets to the grid layout
         widgets_i = 0
-        gbox2 = QtWidgets.QGridLayout()
-        # for group in self.widgets_group_array:
-        gbox = QtWidgets.QGridLayout()
-        # toolbox = QtWidgets.QStyleOptionToolBox()
-        # for key, widgets in self.widgets_group_dict[group]:
         for widgets in self.widgets_array:
             widget_i = 1
             for widget in widgets:
                 gbox.addWidget(widget, widgets_i, widget_i)
-                # toolbox.addItem(widget, key)
                 if widgets_i > 0:
                     widget.setEnabled(False)
 
                 widget_i += 1
             widgets_i += 1
 
-            # groupbox.setLayout(gridbox)
-            # groupbox.setLayout(gbox)
-            # toolbox.addItem(gbox)
-            # gbox2.addWidget(toolbox)
-
-        vbox = QtWidgets.QVBoxLayout()
-        # vbox.addItem(gbox2)
-        vbox.addItem(gbox)
+        vbox = QtGui.QVBoxLayout()
+        vbox.addLayout(gbox)
         vbox.addStretch(1.0)
 
         self.setLayout(vbox)
 
     def update_param(self, option):
-        if self.combo_tf_method.currentText() in ['wsp', 'translucent2']:
+        if self.combo_vr_method.currentText() == 'translucent':
             for widget in self.widgets_dict['density_factor']:
                 widget.show()
         else:
             for widget in self.widgets_dict['density_factor']:
                 widget.hide()
 
-        if self.combo_tf_method.currentText() == 'lmip' or self.combo_tf_method.currentText() == 'iso':
+        if self.combo_vr_method.currentText() == 'lmip' or self.combo_vr_method.currentText() == 'iso':
             for widget in self.widgets_dict['threshold']:
                 widget.show()
         else:
@@ -521,15 +400,13 @@ class ObjectWidget(QtWidgets.QWidget):
         self.signal_objet_changed.emit()
 
     def showDialog(self):
-        filename = QtWidgets.QFileDialog.getOpenFileName(self,
-                                                         'Open file',
-                                                         filter='FITS Images (*.fits, *.FITS)')
-        # '/Users/danyvohl/code/data')
+        filename = QtGui.QFileDialog.getOpenFileName(self,
+                                                     'Open file',
+                                                     '/Users/danyvohl/code/data')
 
-        if filename[0] != "":
+        if filename != "":
             # Load file
-            print(filename)
-            self.loaded_cube = fits.open(filename[0])
+            self.loaded_cube = fits.open(filename)
 
             try:
                 self.vol_min = self.loaded_cube[0].header["DATAMIN"]
@@ -550,50 +427,23 @@ class ObjectWidget(QtWidgets.QWidget):
             # self.l_clim_min.setText(str(min))
             # self.l_clim_max.setText(str(max))
 
-            # for widgets in self.widgets_array:
-            #     for widget in widgets:
-            #         widget.setEnabled(True)
+            for widgets in self.widgets_array:
+                for widget in widgets:
+                    widget.setEnabled(True)
+
+            # Update label
+            self.l_low_discard_filter_value.setText(str(self.vol_min))
 
             self.signal_file_loaded.emit()
-            # self.signal_objet_changed.emit()
-            # self.signal_camera_changed.emit()
+            self.signal_objet_changed.emit()
+            self.signal_camera_changed.emit()
 
-    def update_discard_filter_text(self, min, max):
-        # Update label
-        self.vol_min = min
-        self.vol_max = max
-        try:
-            self.l_high_discard_filter_value.setText(self.format_digits(self.vol_max))
-            self.l_low_discard_filter_value.setText(self.format_digits(self.vol_min))
-        except:
-            pass
+    def update_clim(self):
+        self.signal_file_loaded.emit()
 
-    def enable_widgets(self):
-        for widgets in self.widgets_array:
-            for widget in widgets:
-                widget.setEnabled(True)
-
-    def format_digits(self, value):
-        if isinstance(value, int):
-            return str(value)
-        else:
-            return "{:.4f}".format(value)
-
-    # def update_clim(self):
-    #     self.signal_file_loaded.emit()
-
-    def update_view(self, option):
-        self.signal_camera_changed.emit()
-
-    def update_fov(self):
+    def update_camera(self, option):
         self.l_fov_value.setText(str(self.slider_fov.value()))
-        self.signal_fov_changed.emit()
-
-    def update_autorotate(self):
-        self.signal_autorotate_changed.emit()
-
-    # def update_log_scale(self):
-    #     self.signal_log_scale_changed.emit()
+        self.signal_camera_changed.emit()
 
     def update_scaling(self):
         self.l_scalex_value.setText(str(self.slider_scalex.value()))
@@ -618,61 +468,28 @@ class ObjectWidget(QtWidgets.QWidget):
         self.l_filter_size_value.setText(str(self.slider_filter_size.value() + self.slider_filter_size.value() + 1))
         self.signal_filter_size_changed.emit()
 
-    def update_filter_type(self):
-        # if self.combo_filter_type.currentText() == 'Rescale':
-        #     for widget in self.widgets_dict['high_discard_filter']:
-        #         widget.show()
-        # else:
-        #     for widget in self.widgets_dict['high_discard_filter']:
-        #         widget.hide()
-        #
-        #     self.reset_discard_filters_values()
-
-        self.signal_filter_type_changed.emit()
-
     def update_gaussian_filter_size(self):
         self.signal_filter_size_changed.emit()
-
-    def update_high_discard_filter(self):
-
-        # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
-
-        self.high_scaled_value = self.scale_value(self.slider_high_discard_filter.value(),
-                                                  self.slider_high_discard_filter.minimum(),
-                                                  self.slider_high_discard_filter.maximum(),
-                                                  self.vol_min,
-                                                  self.vol_max)
-
-        if isinstance(self.high_scaled_value, int):
-            self.l_high_discard_filter_value.setText(str(self.high_scaled_value))
-        else:
-            self.l_high_discard_filter_value.setText("{:.4f}".format(self.high_scaled_value))
-
-        self.signal_high_discard_filter_changed.emit()
 
     def update_low_discard_filter(self):
 
         # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
 
-        self.low_scaled_value = self.scale_value(self.slider_low_discard_filter.value(),
-                                                 self.slider_low_discard_filter.minimum(),
-                                                 self.slider_low_discard_filter.maximum(),
-                                                 self.vol_min,
-                                                 self.vol_max)
+        scaled_value = self.scale_value(self.slider_low_discard_filter.value(),
+                                        self.slider_low_discard_filter.minimum(),
+                                        self.slider_low_discard_filter.maximum(),
+                                        self.vol_min,
+                                        self.vol_max)
 
-        if isinstance(self.l_low_discard_filter_value, int):
-            self.l_low_discard_filter_value.setText(str(self.low_scaled_value))
-        else:
-            self.l_low_discard_filter_value.setText("{:.4f}".format(self.low_scaled_value))
-
+        self.l_low_discard_filter_value.setText(str(scaled_value))
         self.signal_low_discard_filter_changed.emit()
 
     def update_density_factor(self):
-        scaled_value = self.format_digits(self.scale_value(self.slider_density_factor.value(),
-                                                           self.slider_density_factor.minimum(),
-                                                           self.slider_density_factor.maximum(),
-                                                           0.001,
-                                                           2))
+        scaled_value = self.scale_value(self.slider_density_factor.value(),
+                                        self.slider_density_factor.minimum(),
+                                        self.slider_density_factor.maximum(),
+                                        0.001,
+                                        1)
 
         self.l_density_factor_value.setText(str(scaled_value))
         self.signal_density_factor_changed.emit()
@@ -702,15 +519,14 @@ class ObjectWidget(QtWidgets.QWidget):
 
 
 class Canvas3D(scene.SceneCanvas):
-    def __init__(self, resolution):
+    def __init__(self):
         self._configured = False
         self._fg = (0.5, 0.5, 0.5, 1)
 
         scene.SceneCanvas.__init__(self,
                                    keys='interactive',
-                                   size=(resolution.width(), resolution.height()),
+                                   size=(800, 600),
                                    show=True)
-        # self.measure_fps()
 
         self._configure_canvas()
 
@@ -722,7 +538,6 @@ class Canvas3D(scene.SceneCanvas):
 
         # Set up a viewbox to display the image with interactive pan/zoom
         # and colorbar
-
         self.central_widget.bgcolor = "#404040"
         self.grid = self.central_widget.add_grid(spacing=0, margin=0)
         self._configure_3d()
@@ -746,13 +561,6 @@ class Canvas3D(scene.SceneCanvas):
         #     | hist  |       |
         #  r2 +---------------|
 
-        #     c0      c1      c2
-        #  r0 +---------------|
-        #     | cbar  |       |
-        #  r1 +--------  3D   |
-        #     | 2D    |       |
-        #  r2 +---------------|
-
         # colorbar
         # row 0, column 0
         self.cbar_left = self.grid.add_widget(None, row=0, col=0, border_color='#404040', bgcolor="#404040")
@@ -763,10 +571,6 @@ class Canvas3D(scene.SceneCanvas):
         # self.view_histogram = self.grid.add_view(row=1, col=0, border_color='#404040', bgcolor="#404040")
         # self.view_histogram.camera = 'panzoom'
         # self.camera_histogram = self.view_histogram.camera
-
-        # self.view_2D = self.grid.add_view(row=1, col=0, border_color='#404040', bgcolor="#404040")
-        # self.view_histogram.camera = 'panzoom'
-
 
         # 3D visualisation
         # row 0-1, column 1
@@ -818,7 +622,7 @@ class Canvas3D(scene.SceneCanvas):
         """
 
         self.cbar = scene.ColorBarWidget(orientation=position,
-                                         label=label,
+                                         label_str=label,
                                          cmap=cmap,
                                          clim=clim,
                                          border_width=border_width,
@@ -827,8 +631,8 @@ class Canvas3D(scene.SceneCanvas):
 
         self.cbar.label.font_size = 15
         self.cbar.label.color = "white"
-        self.cbar.ticks[0].font_size = 12
-        self.cbar.ticks[1].font_size = 12
+        self.cbar.ticks[0].font_size = 8
+        self.cbar.ticks[1].font_size = 8
         self.cbar.ticks[0].color = "white"
         self.cbar.ticks[1].color = "white"
 
@@ -893,7 +697,7 @@ class Canvas3D(scene.SceneCanvas):
     def set_volume_scene(self, cube):
         # # Set up a viewbox to display the image with interactive pan/zoom
         if self.view:
-            canvas = self.central_widget.remove_widget(self.grid)
+            self.central_widget.remove_widget(self.grid)
             self._configure_canvas()
 
         self.unfreeze()
@@ -922,22 +726,16 @@ class Canvas3D(scene.SceneCanvas):
             # except:
             #     self.vel = "unknown"
 
-            print(cube[0].data.shape)
+            print
+            cube[0].data.shape
             if len(cube[0].data.shape) == 4:
-                # Test
-                # cube[0].data = np.swapaxes(cube[0].data, 0, 1)
-
-
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
                 data = cube[0].data[0][:2048, :2048, :2048]
-                # data = cube[0].data[0][75:150, 110:150, 100:150]
-
                 self.vel_axis = cube[0].data[0].shape[0]
             else:
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-                data = cube[0].data[:2048, :2048, :2048]
-                # data = cube[0].data[:,60:-60,:]
-                # data = cube[0].data[:, :, :]
+                # data = cube[0].data[:2048, :2048, :2048]
+                data = cube[0].data[:, 60:-60, :]
                 self.vel_axis = cube[0].data.shape[0]
 
             try:
@@ -951,62 +749,25 @@ class Canvas3D(scene.SceneCanvas):
                 self.vel_type = "Epoch"
 
             try:
-                # TODO: Possibly use astropy's wcs module for all of this.
                 self.vel_val = cube[0].header['CRVAL3']
-                lim_is_set = False
-                try:
-                    self.vel_delt = cube[0].header['CDELT3']
-                    set_lim = True
-                except:
-                    print("No CDELT3 card in header.")
-                    set_lim = False
+                self.vel_delt = cube[0].header['CDELT3']
 
-                if self.vel_type == 'VELO-HEL' or self.vel_type == 'FELO-HEL':
-                    self.vel_type += ' (km/s)'
-                    if set_lim:
-                        self.clim_vel = np.int(np.round(float(self.vel_val) / 1000)), np.int(
-                            np.round((float(self.vel_val) +
-                                      float(self.vel_delt) *
-                                      self.vel_axis) / 1000))
-                        lim_is_set = True
+                if self.vel_type == 'VELO-HEL':
+                    # Currently in m/s
+                    self.vel_type = 'km/s'
+                    self.clim_vel = np.int(np.round(float(self.vel_val) / 1000)), np.int(np.round((float(self.vel_val) +
+                                                                                                   float(
+                                                                                                       self.vel_delt) *
+                                                                                                   self.vel_axis) / 1000))
+                else:
+                    if self.vel_type == 'FELO-HEL':
+                        self.vel_type = 'km/s'
 
-                elif self.vel_type == 'FREQ':
-                    if cube[0].header['CUNIT3'] == 'Hz':
-                        self.vel_type += ' (T' + cube[0].header['CUNIT3'] + ')'  # Hz to THz
-                        self.clim_vel = float(self.vel_val) / (1000 * 1000 * 1000), \
-                                        (float(self.vel_val) + float(self.vel_delt) * self.vel_axis) / (
-                                        1000 * 1000 * 1000)
-                        lim_is_set = True
-                    else:
-                        self.vel_type += ' (' + cube[0].header['CUNIT3'] + ')'
-                        self.clim_vel = np.int(np.round(float(self.vel_val))), \
-                                        np.int(np.round((float(self.vel_val) +
-                                                         float(self.vel_delt) *
-                                                         self.vel_axis)))
-                        lim_is_set = True
-                elif self.vel_type == 'WAVE':
-                    self.vel_type += ' (' + cube[0].header['CUNIT3'] + ')'
-
-                if set_lim == True and lim_is_set == False:
                     self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round((float(self.vel_val) +
                                                                                             float(self.vel_delt) *
                                                                                             self.vel_axis)))
-                    lim_is_set = True
-
-                if set_lim == False:
-                    try:
-                        self.vel_delt = cube[0].header['STEP']
-                        self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round((float(self.vel_val) +
-                                                                                                float(self.vel_delt) *
-                                                                                                self.vel_axis)))
-                    except:
-                        self.clim_vel = 0, self.vel_axis
-
-                print("self.clim_vel", self.clim_vel)
-
             except:
-                self.vel_val = "Undefined"
-                print("self.clim_vel", self.clim_vel)
+                self.clim_vel = 0, self.vel_axis
 
             data = np.flipud(np.rollaxis(data, 1))
 
@@ -1025,23 +786,6 @@ class Canvas3D(scene.SceneCanvas):
                                            parent=self.view.scene,
                                            mode='lines')
 
-            from extern.vispy.gloo import gl
-            gl.glLineWidth(1.5)
-
-            self.view.add(self.axis)
-
-            # Cheat to make the box width bigger.
-            #
-            # pos = np.array([[0, 0, 0], [1, 1, 1]])
-            # self.line = scene.Line(pos=pos,
-            #                   color='green',
-            #                   method='gl',
-            #                   width=2,
-            #                   connect='strip',
-            #                   parent=self.view.scene)
-            # self.line.antialias = 1
-
-
             # Add colorbar
             self.colorbar(label=str(self.vel_type),
                           clim=self.volume.clim,
@@ -1053,18 +797,14 @@ class Canvas3D(scene.SceneCanvas):
 
             # self.histogram(data.ravel())
 
-
-
-            # self.rotation and self.timer used for autorotate.
-            self.rotation = scene.MatrixTransform()
-            self.timer = app.Timer(connect=self.rotate)
-            self.angle = 0.
+            self.view.add(self.axis)
 
             self.freeze()
 
         except ValueError as e:
             t = e
-            print(t)
+            print
+            t
 
     def create_cube(self, shape):
         """ Generate vertices & indices for a filled and outlined cube
@@ -1155,27 +895,24 @@ class Canvas3D(scene.SceneCanvas):
 
         return vertices, filled, outline
 
-    # def set_data(self, data, tf_method, cmap, clim_min, clim_max):
-    def set_data(self, tf_method, cmap, combo_color_method, interpolation_method):
-        self.volume.method = tf_method
+    # def set_data(self, data, vr_method, cmap, clim_min, clim_max):
+    def set_data(self, vr_method, cmap, combo_color_method, interpolation_method):
+        self.volume.method = vr_method
         self.volume.cmap = cmap
         self.volume.color_method = combo_color_method
         self.volume.interpolation = interpolation_method
 
-        print(self.volume.color_method)
         if (self.volume.color_method == 0):
             label = str(self.bunit)
-            print("label", label)
             clim = self.volume.clim
         else:
             label = str(self.vel_type)
-            print("label", label)
             clim = self.clim_vel
 
         # print ('clim', clim)
 
         self.cbar.clim = clim
-        self.cbar.label_str = label
+        self.cbar.label = label
         self.cbar.cmap = cmap
 
         # self.volume.set_data(data, [clim_min, clim_max])
@@ -1202,42 +939,22 @@ class Canvas3D(scene.SceneCanvas):
     def set_filter_size(self, filter_size):
         self.volume.filter_size = filter_size
 
-    def set_filter_type(self, filter_type):
-        self.volume.filter_type = filter_type
-
     def set_gaussian_filter(self, use_gaussian_filter, gaussian_filter_size):
         self.volume.use_gaussian_filter = use_gaussian_filter
         self.volume.gaussian_filter_size = gaussian_filter_size
 
-    def set_high_discard_filter(self, high_discard_filter_value, scaled_value, filter_type):
-        self.volume.high_discard_filter_value = high_discard_filter_value
-        self.update_clim("high", scaled_value, filter_type)
-
-    def set_low_discard_filter(self, low_discard_filter_value, scaled_value, filter_type):
+    def set_low_discard_filter(self, low_discard_filter_value):
         self.volume.low_discard_filter_value = low_discard_filter_value
-        self.update_clim("low", scaled_value, filter_type)
-
-    def update_clim(self, type, value, filter_type):
-        print("self.volume.color_method", self.volume.color_method)
-        if self.volume.color_method == 0:
-            if filter_type == 'Rescale':
-                if type == "low":
-                    self.cbar.clim = [value, self.cbar.clim[1]]
-                if type == "high":
-                    self.cbar.clim = [self.cbar.clim[0], value]
 
     def set_density_factor(self, density_factor):
         # print (density_factor)
         self.volume.density_factor = density_factor
 
-    def set_fov(self, fov):
-        self.view.camera.fov = fov
-
     def set_camera(self, cam, fov):
-        if cam == 'Perspectivecamera':
-            self.view.camera = scene.cameras.Perspectivecamera(parent=self.view.scene,
+        if cam == 'PerspectiveCamera':
+            self.view.camera = scene.cameras.PerspectiveCamera(parent=self.view.scene,
                                                                fov=float(fov),
-                                                               name='Perspectivecamera',
+                                                               name='PerspectiveCamera',
                                                                center=(0.5, 0.5, 0.5))
         if cam == 'Turntable':
             self.view.camera = scene.cameras.TurntableCamera(parent=self.view.scene,
@@ -1246,56 +963,29 @@ class Canvas3D(scene.SceneCanvas):
                                                              fov=float(fov),
                                                              name='Turntable')
         if cam == 'Fly':
-            self.view.camera = scene.cameras.Flycamera(parent=self.view.scene,
+            self.view.camera = scene.cameras.FlyCamera(parent=self.view.scene,
                                                        fov=float(fov),
                                                        name='Fly')
         if cam == 'Arcball':
-            self.view.camera = scene.cameras.Arcballcamera(parent=self.view.scene,
+            self.view.camera = scene.cameras.ArcballCamera(parent=self.view.scene,
                                                            fov=float(fov),
                                                            name='Arcball')
 
-    def set_autorotate(self, flag):
-        if flag == True:
-            # self.set_camera("Perspectivecamera", 60)
-            # self.timer.start(0.01, 100)
-            self.timer.start(0.01)
-        else:
-            self.timer.stop()
-
-    def rotate(self, event):
-        # self.angle += .005
-        self.angle = 3.6
-        # self.rotation.rotate(self.angle, (0, 0, 1))
-        # self.axis.transform = self.volume.transform = self.rotation
-        self.view.camera.orbit(self.angle, 0)
-
-    def set_log_scale(self, flag):
-        self.volume.log_scale = flag
-
     def set_scaling(self, scalex, scaley, scalez):
         # TODO: get translation right to stay centered.
-        self.axis.transform = self.volume.transform = scene.STTransform(scale=(scalex, scalez, scaley),
+        self.axis.transform = self.volume.transform = scene.STTransform(scale=(scalex, scaley, scalez),
                                                                         translate=(
-                                                                        -scalex ** 2, -scalez ** 2, -scaley ** 2))
+                                                                        -scalex ** 2, -scaley ** 2, -scalez ** 2))
 
     def set_transform(self, x, y, z):
         self.unfreeze()
         self.axis.transform = self.volume.transform = scene.STTransform(translate=(x, y, z))
         self.freeze()
 
+
 # -----------------------------------------------------------------------------
-# gloo.gl.use_gl('gl2 debug')
 if __name__ == '__main__':
-    appQt = QtWidgets.QApplication(sys.argv)
-    resolution = appQt.desktop().screenGeometry()
-
-    # Create and display the splash screen
-    splash_pix = QtGui.QPixmap('images/splash_screen.png')
-    splash = QtWidgets.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
-    splash.setMask(splash_pix.mask())
-    splash.show()
-    appQt.processEvents()
-
-    win = MainWindow(resolution)
+    appQt = QtGui.QApplication(sys.argv)
+    win = MainWindow()
     win.show()
     appQt.exec_()
