@@ -50,13 +50,13 @@ Other options include:
 Colour
 ------
 
-**Shwirl** includes different transfer function and colouring methods.
+**Shwirl** includes different transfer functions and colouring methods.
 
-    * Transfer function
+    * Transfer functions
 
          - Maximum Intensity Projection (MIP)
          - Local Maximum Intensity Projection (LMIP)
-         - Weighted Sum Projection (WSP)
+         - Accumulated Voxel Intensity Projection (AVIP)
          - Iso surface
 
     * Colouring methods
@@ -65,15 +65,15 @@ Colour
      - Moment 1 (maps velocity to colour and voxel intensity to transparency)
      - RGB cube (maps voxel xyz position to rgb, and voxel intensity to transparency)
 
-Example of WSP + Moment 0:
+Example of AVIP + Moment 0:
 
 .. image:: _static/10-wsp-mom0.png
 
-Example of WSP + Moment 1:
+Example of AVIP + Moment 1:
 
 .. image:: _static/11-wsp-mom1.png
 
-Example of WSP + RGB cube:
+Example of AVIP + RGB cube:
 
 .. image:: _static/12-wsp-rgb.png
 

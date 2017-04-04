@@ -4,7 +4,7 @@ Installation
 Prerequisites
 -------------
 
-**Shwirl** has been developed on top of `Astropy <http://www.astropy.org>`_
+**Shwirl** utilises `Astropy <http://www.astropy.org>`_
 to handle FITS files and World Coordinate System, `Qt <http://www.qtcentre.org>`_ (and
 `PyQt <https://www.riverbankcomputing.com/software/pyqt/download5>`_) for the user interface,
 and `VisPy <http://vispy.org>`_, an object-oriented Python visualisation library binding onto OpenGL.

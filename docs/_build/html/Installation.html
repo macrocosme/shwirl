@@ -13,6 +13,8 @@
 
   
   
+  
+  
 
   
 
@@ -44,6 +46,7 @@
 
 <body class="wy-body-for-nav" role="document">
 
+   
   <div class="wy-grid-for-nav">
 
     
@@ -84,7 +87,10 @@
           
             
             
-                <p class="caption"><span class="caption-text">Contents:</span></p>
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="About.html">About</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
@@ -107,8 +113,10 @@
 
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
-        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href="index.html">shwirl</a>
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">shwirl</a>
+        
       </nav>
 
 
@@ -117,23 +125,40 @@
         <div class="rst-content">
           
 
- 
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 <div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-    <li><a href="index.html">Docs</a> &raquo;</li>
-      
-    <li>Installation</li>
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Installation</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
         
-          
+            
             <a href="_sources/Installation.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
@@ -143,7 +168,7 @@
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
-<p><strong>Shwirl</strong> has been developed on top of <a class="reference external" href="http://www.astropy.org">Astropy</a>
+<p><strong>Shwirl</strong> utilises <a class="reference external" href="http://www.astropy.org">Astropy</a>
 to handle FITS files and World Coordinate System, <a class="reference external" href="http://www.qtcentre.org">Qt</a> (and
 <a class="reference external" href="https://www.riverbankcomputing.com/software/pyqt/download5">PyQt</a>) for the user interface,
 and <a class="reference external" href="http://vispy.org">VisPy</a>, an object-oriented Python visualisation library binding onto OpenGL.</p>
@@ -178,15 +203,18 @@ GitHub itself using buttons, or via git (e.g. <cite>git clone https://github.com
 
 
            </div>
+           <div class="articleComments">
+            
+           </div>
           </div>
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="Usage.html" class="btn btn-neutral float-right" title="Usage and snapshots" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="Usage.html" class="btn btn-neutral float-right" title="Usage and snapshots" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="About.html" class="btn btn-neutral" title="About" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="About.html" class="btn btn-neutral" title="About" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -220,13 +248,14 @@ GitHub itself using buttons, or via git (e.g. <cite>git clone https://github.com
             VERSION:'0.1.1',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
         };
     </script>
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

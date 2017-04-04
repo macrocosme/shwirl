@@ -809,7 +809,7 @@ frag_dict = {
     'mip': MIP_FRAG_SHADER,
     'lmip': LMIP_FRAG_SHADER,
     'iso': ISO_FRAG_SHADER,
-    'wsp': TRANSLUCENT_FRAG_SHADER,
+    'avip': TRANSLUCENT_FRAG_SHADER,
     'translucent2': TRANSLUCENT2_FRAG_SHADER,
     'additive': ADDITIVE_FRAG_SHADER,
 }
@@ -845,7 +845,7 @@ class RenderVolumeVisual(Visual):
         The contrast limits. The values in the volume are mapped to
         black and white corresponding to these values. Default maps
         between min and max.
-    method : {'mip', 'wsp', 'additive', 'iso'}
+    method : {'mip', 'avip', 'additive', 'iso'}
         The render method to use. See corresponding docs for details.
         Default 'mip'.
     threshold : float
@@ -1067,7 +1067,7 @@ class RenderVolumeVisual(Visual):
 
         Current options are:
 
-            * wsp: voxel colors are blended along the view ray until
+            * avip: voxel colors are blended along the view ray until
               the result is opaque.
             * mip: maxiumum intensity projection. Cast a ray and display the
               maximum value that was encountered.

@@ -13,6 +13,8 @@
 
   
   
+  
+  
 
   
 
@@ -44,6 +46,7 @@
 
 <body class="wy-body-for-nav" role="document">
 
+   
   <div class="wy-grid-for-nav">
 
     
@@ -84,7 +87,10 @@
           
             
             
-                <p class="caption"><span class="caption-text">Contents:</span></p>
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="About.html">About</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Installation.html">Installation</a></li>
@@ -114,8 +120,10 @@
 
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
-        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href="index.html">shwirl</a>
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">shwirl</a>
+        
       </nav>
 
 
@@ -124,23 +132,40 @@
         <div class="rst-content">
           
 
- 
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 <div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-    <li><a href="index.html">Docs</a> &raquo;</li>
-      
-    <li>Usage and snapshots</li>
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Usage and snapshots</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
         
-          
+            
             <a href="_sources/Usage.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
@@ -193,15 +218,15 @@ slide, select</em>. See what happens!</p>
 </div>
 <div class="section" id="colour">
 <h2>Colour<a class="headerlink" href="#colour" title="Permalink to this headline">¶</a></h2>
-<p><strong>Shwirl</strong> includes different transfer function and colouring methods.</p>
+<p><strong>Shwirl</strong> includes different transfer functions and colouring methods.</p>
 <blockquote>
 <div><ul>
-<li><p class="first">Transfer function</p>
+<li><p class="first">Transfer functions</p>
 <blockquote>
 <div><ul class="simple">
 <li>Maximum Intensity Projection (MIP)</li>
 <li>Local Maximum Intensity Projection (LMIP)</li>
-<li>Weighted Sum Projection (WSP)</li>
+<li>Accumulated Voxel Intensity Projection (AVIP)</li>
 <li>Iso surface</li>
 </ul>
 </div></blockquote>
@@ -217,11 +242,11 @@ slide, select</em>. See what happens!</p>
 </ul>
 </div></blockquote>
 </div></blockquote>
-<p>Example of WSP + Moment 0:</p>
+<p>Example of AVIP + Moment 0:</p>
 <img alt="_images/10-wsp-mom0.png" src="_images/10-wsp-mom0.png" />
-<p>Example of WSP + Moment 1:</p>
+<p>Example of AVIP + Moment 1:</p>
 <img alt="_images/11-wsp-mom1.png" src="_images/11-wsp-mom1.png" />
-<p>Example of WSP + RGB cube:</p>
+<p>Example of AVIP + RGB cube:</p>
 <img alt="_images/12-wsp-rgb.png" src="_images/12-wsp-rgb.png" />
 <img alt="_images/rgb_cube.png" src="_images/rgb_cube.png" />
 <p>MIP is used in the other examples.</p>
@@ -268,15 +293,18 @@ slide, select</em>. See what happens!</p>
 
 
            </div>
+           <div class="articleComments">
+            
+           </div>
           </div>
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="Example.html" class="btn btn-neutral float-right" title="Example data" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="Example.html" class="btn btn-neutral float-right" title="Example data" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="Installation.html" class="btn btn-neutral" title="Installation" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="Installation.html" class="btn btn-neutral" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -310,13 +338,14 @@ slide, select</em>. See what happens!</p>
             VERSION:'0.1.1',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
         };
     </script>
       <script type="text/javascript" src="_static/jquery.js"></script>
       <script type="text/javascript" src="_static/underscore.js"></script>
       <script type="text/javascript" src="_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 

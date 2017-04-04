@@ -354,7 +354,7 @@ class ObjectWidget(QWidget):
         elif type == 'rendering_params':
             l_tf_method = QLabel("Transfer function ")
             # self.l_tf_method = ['mip', 'translucent', 'translucent2', 'iso', 'additive']
-            self.tf_method = ['mip', 'lmip', 'wsp', 'iso']
+            self.tf_method = ['mip', 'lmip', 'avip', 'iso']
             self.combo_tf_method = QComboBox(self)
             self.combo_tf_method.addItems(self.tf_method)
             self.combo_tf_method.currentIndexChanged.connect(self.update_param)
@@ -530,7 +530,7 @@ class ObjectWidget(QWidget):
         self.setLayout(vbox)
 
     def update_param(self, option):
-        if self.combo_tf_method.currentText() in ['wsp', 'translucent2']:
+        if self.combo_tf_method.currentText() in ['avip', 'translucent2']:
             for widget in self.widgets_dict['density_factor']:
                 widget.show()
         else:

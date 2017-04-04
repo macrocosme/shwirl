@@ -7,11 +7,10 @@ Index
 =====
 
 .. image:: _static/shwirl_splash.png
-   :width: 690 px
 
-`Shwirl <https://github.com/macrocosme/shwirl>`_ is an in-house, custom standalone Python program to visualise
+`Shwirl <https://github.com/macrocosme/shwirl>`_ is a custom standalone Python program to visualise
 spectral data cubes with ray-tracing volume rendering. The program has been developed to investigate transfer functions
-and graphics shaders as enablers for scientific visualisation of astronomical data. Details about transfer functions
+and graphics shaders as enablers for scientific visualisation of astronomical data. Details about the transfer functions
 and shaders developed and implemented in **shwirl** can be found in a full length article by Vohl, Fluke, Barnes &
 Hassan (Submitted).
 
