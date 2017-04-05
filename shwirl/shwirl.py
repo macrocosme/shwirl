@@ -114,6 +114,7 @@ class MainWindow(QMainWindow):
 
     def keyPressEvent(self, e):
         if e.key() == QtCore.Qt.Key_Escape:
+            print ("blabla")
             self.app.quit()
 
     def load_volume(self):
