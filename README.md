@@ -36,6 +36,16 @@ See documentation for more details.
 
 In a console, type `python3 shwirl.py`. A GUI should show up!
 
+pip
+---
+When Qt and PyQt is installed, you can install via pip, e.g.
+
+`pip3 install shwirl`
+
+and run with 
+
+`shwirl`
+
 Issues, requests and general inquiries
 --------------------------------------
 Please send issues, feature requests and/or general inquiries to Dany Vohl via http://macrocosme.github.io/#contact.
