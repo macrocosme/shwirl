@@ -95,7 +95,11 @@
 <li class="toctree-l1"><a class="reference internal" href="About.html">About</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#example-installation-procedure">Example installation procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-installation-procedure">Example installation procedure</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#install-with-pip">Install with pip</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-manually">Install manually</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#python-2-7-pyqt4-users">Python 2.7 / PyQt4 users</a></li>
 </ul>
 </li>
@@ -180,12 +184,28 @@ repository as custom modifications have been made that are not readily available
 <h2>Example installation procedure<a class="headerlink" href="#example-installation-procedure" title="Permalink to this headline">¶</a></h2>
 <p>Depending on your operating system and your current configuration, installation steps may vary.
 In general, you can install it using the following:</p>
-<p>First, install Qt5. It can be downloaded via the <a class="reference external" href="qt-project.org/qt5">Qt website</a>.
-Then, install the following python packages: Astropy, PyOpenGL, and PyQt5. These can be installed in a number of ways,
-including from source or via python package managers like <em>pip3</em>. For example:</p>
+<p>First, install Qt5. It can be downloaded via the <a class="reference external" href="qt-project.org/qt5">Qt website</a>. You also need PyQt5,
+which can be installed via a package manager like pip, brew, etc. E.g.</p>
+<div class="code console highlight-default"><div class="highlight"><pre><span></span><span class="n">pip3</span> <span class="n">install</span> <span class="n">PyQt5</span>
+</pre></div>
+</div>
+<div class="section" id="install-with-pip">
+<h3>Install with pip<a class="headerlink" href="#install-with-pip" title="Permalink to this headline">¶</a></h3>
+<p>You can install <strong>shwirl</strong> with pip:</p>
+<div class="code console highlight-default"><div class="highlight"><pre><span></span><span class="n">pip3</span> <span class="n">install</span> <span class="n">shwirl</span>
+</pre></div>
+</div>
+<p>Once installed, in your terminal, you can launch <strong>shwirl</strong> by typing:</p>
+<div class="code console highlight-default"><div class="highlight"><pre><span></span><span class="n">shwirl</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="install-manually">
+<h3>Install manually<a class="headerlink" href="#install-manually" title="Permalink to this headline">¶</a></h3>
+<p>You first need to install the following python packages: Astropy, and PyOpenGL.
+These can be installed in a number of ways, including from source or via python package managers like <em>pip3</em>. For example:</p>
 <div class="code console highlight-default"><div class="highlight"><pre><span></span><span class="n">pip3</span> <span class="n">install</span> <span class="n">astropy</span>
 <span class="n">pip3</span> <span class="n">install</span> <span class="n">PyOpenGL</span>
-<span class="n">pip3</span> <span class="n">install</span> <span class="n">PyQt5</span>
 </pre></div>
 </div>
 <p>Go download <strong>shwirl</strong> from <a class="reference external" href="https://github.com/macrocosme/shwirl">GitHub</a>. This can be done from
@@ -193,6 +213,7 @@ GitHub itself using buttons, or via git (e.g. <cite>git clone https://github.com
 <p>Once everything is installed/downloaded, you should be able to start <strong>shwirl</strong>&#8216;s the Graphical User Interface (GUI) via something like:</p>
 <div class="code console highlight-default"><div class="highlight"><pre><span></span><span class="n">python3</span> <span class="n">shwirl</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
+</div>
 </div>
 </div>
 <div class="section" id="python-2-7-pyqt4-users">

@@ -20,15 +20,36 @@ Example installation procedure
 Depending on your operating system and your current configuration, installation steps may vary.
 In general, you can install it using the following:
 
-First, install Qt5. It can be downloaded via the `Qt website <qt-project.org/qt5>`_.
-Then, install the following python packages: Astropy, PyOpenGL, and PyQt5. These can be installed in a number of ways,
-including from source or via python package managers like *pip3*. For example:
+First, install Qt5. It can be downloaded via the `Qt website <qt-project.org/qt5>`_. You also need PyQt5,
+which can be installed via a package manager like pip, brew, etc. E.g.
+
+.. code:: console
+
+  pip3 install PyQt5
+
+Install with pip
+~~~~~~~~~~~~~~~~
+You can install **shwirl** with pip:
+
+.. code:: console
+
+  pip3 install shwirl
+
+Once installed, in your terminal, you can launch **shwirl** by typing:
+
+.. code:: console
+
+  shwirl
+
+Install manually
+~~~~~~~~~~~~~~~~
+You first need to install the following python packages: Astropy, and PyOpenGL.
+These can be installed in a number of ways, including from source or via python package managers like *pip3*. For example:
 
 .. code:: console
 
   pip3 install astropy
   pip3 install PyOpenGL
-  pip3 install PyQt5
 
 Go download **shwirl** from `GitHub <https://github.com/macrocosme/shwirl>`_. This can be done from
 GitHub itself using buttons, or via git (e.g. `git clone https://github.com/macrocosme/shwirl.git`).

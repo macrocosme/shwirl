@@ -21,9 +21,7 @@ We implemented the algorithms in the fragment shader using the GLSL language.
 
 The software has been tested on Linux, Mac, and
 Windows machines, including remote desktop on cloud computing infrastructure. While the software is available for
-download and ready to visualise data, this is not intended as a full software release just yet.
-The open source code allows interested individuals to inspect how custom shaders can be written, and can be a
-starting point to develop a more generic visualisation and analysis software.
+download and ready to visualise data, this is not intended as a full software release just yet. 
 
 Documentation
 -------------

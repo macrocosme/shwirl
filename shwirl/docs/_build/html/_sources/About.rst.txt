@@ -19,10 +19,7 @@ and `VisPy <http://vispy.org>`_, an object-oriented Python visualisation library
 We implemented the algorithms in the fragment shader using the GLSL language.
 
 The software has been used on Linux, Mac, and
-Windows machines, including remote desktop on cloud computing infrastructure. While the software is available for
-download and ready to visualise data, this is not intended as a full software release just yet.
-The open source code allows interested individuals to inspect how custom shaders can be written, and can be a
-starting point to develop a more generic visualisation and analysis software.
+Windows machines, including remote desktop on cloud computing infrastructure.
 
 GPUs
 ----
@@ -32,3 +29,4 @@ Rendering speed will vary depending on your hardware.
 Issues, requests and general inquiries
 --------------------------------------
 Please send issues, feature requests and/or general inquiries to Dany Vohl via http://macrocosme.github.io/#contact.
+You can also simply open a `new issue <https://github.com/macrocosme/shwirl/issues>`_ on github directly.
