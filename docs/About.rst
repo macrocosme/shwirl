@@ -18,11 +18,16 @@ to handle FITS files and World Coordinate System, `Qt <http://www.qtcentre.org>`
 and `VisPy <http://vispy.org>`_, an object-oriented Python visualisation library binding onto OpenGL.
 We implemented the algorithms in the fragment shader using the GLSL language.
 
-The software has been tested on Linux, Mac, and
+The software has been used on Linux, Mac, and
 Windows machines, including remote desktop on cloud computing infrastructure. While the software is available for
 download and ready to visualise data, this is not intended as a full software release just yet.
 The open source code allows interested individuals to inspect how custom shaders can be written, and can be a
 starting point to develop a more generic visualisation and analysis software.
+
+GPUs
+----
+Up to now, we have tested the code on NVIDIA GeForce GTX TITAN X, NVIDIA GeForce GT 750M, and NVIDIA GRID K1.
+Rendering speed will vary depending on your hardware.
 
 Issues, requests and general inquiries
 --------------------------------------
