@@ -4,12 +4,11 @@ from __future__ import division
 # Basic imports
 import sys
 import numpy as np
-import time
 
 # Vispy imports
-from extern.vispy import app, scene, io
-from extern.vispy.color import get_colormaps
-from shaders import RenderVolume
+from shwirl.extern.vispy import app, scene, io
+from shwirl.extern.vispy.color import get_colormaps
+from shwirl.shaders import RenderVolume
 
 # Astropy imports
 from astropy.io import fits
@@ -1052,7 +1051,7 @@ class Canvas3D(scene.SceneCanvas):
                                            parent=self.view.scene,
                                            mode='lines')
 
-            from extern.vispy.gloo import gl
+            from shwirl.extern.vispy.gloo import gl
             gl.glLineWidth(1.5)
 
             self.view.add(self.axis)
@@ -1310,14 +1309,30 @@ class Canvas3D(scene.SceneCanvas):
         self.axis.transform = self.volume.transform = scene.STTransform(translate=(x, y, z))
         self.freeze()
 
+
+
 # -----------------------------------------------------------------------------
-# gloo.gl.use_gl('gl2 debug')
+def main():
+    appQt = QApplication(sys.argv)
+    resolution = appQt.desktop().screenGeometry()
+
+    # Create and display the splash screen
+    splash_pix = QPixmap('shwirl/images/splash_screen.png')
+    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
+    splash.setMask(splash_pix.mask())
+    splash.show()
+    appQt.processEvents()
+
+    win = MainWindow(resolution)
+    win.show()
+    appQt.exec_()
+
 if __name__ == '__main__':
     appQt = QApplication(sys.argv)
     resolution = appQt.desktop().screenGeometry()
 
     # Create and display the splash screen
-    splash_pix = QPixmap('images/splash_screen.png')
+    splash_pix = QPixmap('shwirl/images/splash_screen.png')
     splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
     splash.show()
