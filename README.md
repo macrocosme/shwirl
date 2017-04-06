@@ -27,7 +27,7 @@ starting point to develop a more generic visualisation and analysis software.
 
 Documentation
 -------------
-Documentation can be found at [readthedocs](link).
+Documentation can be found at [readthedocs](http://shwirl.readthedocs.io/en/latest/).
 
 Installation
 ------------
