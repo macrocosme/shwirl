@@ -17,21 +17,23 @@ for subpackage in ['antialias', 'arrowheads', 'arrows', 'collections',
                    'transforms']:
     package_data['shwirl.extern.vispy.glsl.' + subpackage] = ['*.vert','*.frag', "*.glsl"]
 
+for subpackage in ['shwirl.extern.vispy.io._data']:
+    package_data[subpackage] = ['*.npy', '*.*']
+
 setup(
-    name='shw_pk_t',
+    name='shwirl',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1.6',
+    version='0.1.2',
 
-    # description='Meaningful colouring of spectral cube data with volume rendering',
-    description='shw_pk_t',
+    description='Meaningful colouring of spectral cube data with volume rendering',
     long_description=long_description,
 
     # The project's main homepage.
-    # url='https://github.com/macrocosme/shwirl',
-    url='',
+    url='https://github.com/macrocosme/shwirl',
+    # url='',
 
     # Author details
     author='Dany Vohl',
@@ -74,7 +76,8 @@ setup(
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
-    packages=['shwirl.images', 'shwirl.extern', 'shwirl.extern.vispy', 'shwirl.extern.vispy.io', 'shwirl.extern.vispy.io.tests', 'shwirl.extern.vispy.app',
+    packages=['shwirl.images', 'shwirl.extern', 'shwirl.extern.vispy', 'shwirl.extern.vispy.io', 'shwirl.extern.vispy.io.tests',
+              'shwirl.extern.vispy.io._data', 'shwirl.extern.vispy.app',
               'shwirl.extern.vispy.app.tests', 'shwirl.extern.vispy.app.backends', 'shwirl.extern.vispy.app.backends.tests',
               'shwirl.extern.vispy.app.backends.ipython', 'shwirl.extern.vispy.ext', 'shwirl.extern.vispy.ext._bundled',
               'shwirl.extern.vispy.ext._bundled.cassowary', 'shwirl.extern.vispy.gloo', 'shwirl.extern.vispy.gloo.gl',
