@@ -4,7 +4,6 @@ from __future__ import division
 # Basic imports
 import sys
 import numpy as np
-import time
 
 # Vispy imports
 from extern.vispy import app, scene, io

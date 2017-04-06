@@ -40,6 +40,11 @@ Issues, requests and general inquiries
 --------------------------------------
 Please send issues, feature requests and/or general inquiries to Dany Vohl via http://macrocosme.github.io/#contact.
 
+License
+-------
+shwirl is licensed under the terms of the (new) BSD license. 
+A copy of the license is included within this repository.
+
 Copyright
 ---------
 Copyright (c) 2015, Dany Vohl
