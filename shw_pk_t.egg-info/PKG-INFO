@@ -1,0 +1,77 @@
+Metadata-Version: 1.1
+Name: shw-pk-t
+Version: 0.1.6
+Summary: shw_pk_t
+Home-page: UNKNOWN
+Author: Dany Vohl
+Author-email: danyvohl@gmail.com
+License: MIT
+Description: ![alt text](docs/_static/shwirl_splash.png "Shwirl")
+        
+        About shwirl
+        =============
+        
+        **shwirl** is a custom standalone Python program to visualise spectral data cubes with ray-tracing volume rendering.
+        The program has been developed to investigate transfer functions and graphics shaders as enablers for
+        scientific visualisation of astronomical data. Details about transfer functions and shaders developed and implemented in
+        **shwirl** can be found in a full length article by Vohl, Fluke, Barnes & Hassan (Submitted).
+        
+        A transfer function is an arbitrary function that combines volumetric elements (or voxels) to set the colour,
+        intensity, or transparency level of each pixel in the final image. A graphics shader is an algorithmic kernel
+        used to compute several properties of the final image such as colour, depth, and/or transparency.
+        Shaders are particularly suited to computing transfer functions, and are an integral part of the graphics
+        pipeline on Graphics Processing Units.
+        
+        The program utilises [Astropy](http://www.astropy.org) to handle FITS files and World Coordinate System, 
+        [Qt](http://www.qtcentre.org) (and [PyQt](https://www.riverbankcomputing.com/software/pyqt/download5)) for the user interface,
+        and [VisPy](http://vispy.org), an object-oriented Python visualisation library binding onto OpenGL.
+        We implemented the algorithms in the fragment shader using the GLSL language.
+        
+        The software has been tested on Linux, Mac, and
+        Windows machines, including remote desktop on cloud computing infrastructure. While the software is available for
+        download and ready to visualise data, this is not intended as a full software release just yet.
+        The open source code allows interested individuals to inspect how custom shaders can be written, and can be a
+        starting point to develop a more generic visualisation and analysis software.
+        
+        Documentation
+        -------------
+        Documentation can be found at [readthedocs](link).
+        
+        Installation
+        ------------
+        You need Qt5, PyQt5, PyOpenGL, and Astropy. Then download **shwirl**'s code. 
+        See documentation for more details. 
+        
+        In a console, type `python3 shwirl.py`. A GUI should show up!
+        
+        Issues, requests and general inquiries
+        --------------------------------------
+        Please send issues, feature requests and/or general inquiries to Dany Vohl via http://macrocosme.github.io/#contact.
+        
+        License
+        -------
+        shwirl is licensed under the terms of the (new) BSD license. 
+        A copy of the license is included within this repository.
+        
+        Copyright
+        ---------
+        Copyright (c) 2015, Dany Vohl
+        All rights reserved.
+        
+        
+Keywords: visualisation astronomy spectral cubes
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Scientific/Engineering :: Visualization
+Classifier: Topic :: Scientific/Engineering :: Astronomy
+Classifier: Topic :: Scientific/Engineering :: Information Analysis
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
