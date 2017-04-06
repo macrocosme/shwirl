@@ -1,4 +1,4 @@
-![alt text](docs/_static/shwirl_splash.png "Shwirl")
+![alt text](shwirl/docs/_static/shwirl_splash.png "Shwirl")
 
 About shwirl
 =============
