@@ -31,10 +31,8 @@ Documentation can be found at [readthedocs](http://shwirl.readthedocs.io/en/late
 
 Installation
 ------------
-You need Qt5, PyQt5, PyOpenGL, and Astropy. Then download **shwirl**'s code. 
+You need Qt5, PyQt5. 
 See documentation for more details. 
-
-In a console, type `python3 shwirl.py`. A GUI should show up!
 
 pip
 ---
