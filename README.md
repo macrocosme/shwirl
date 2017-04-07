@@ -1,5 +1,7 @@
 ![alt text](shwirl/docs/_static/shwirl_splash.png "Shwirl")
 
+https://readthedocs.org/projects/pip/badge/?version=latest
+
 About shwirl
 =============
 
