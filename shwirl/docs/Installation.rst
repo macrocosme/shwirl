@@ -41,6 +41,25 @@ Once installed, in your terminal, you can launch **shwirl** by typing:
 
   shwirl
 
+Install manually
+~~~~~~~~~~~~~~~~
+You first need to install the following python packages: Astropy, and PyOpenGL.
+These can be installed in a number of ways, including from source or via python package managers like *pip3*. For example:
+
+.. code:: console
+
+  pip3 install astropy
+  pip3 install PyOpenGL
+
+Go download **shwirl** from `GitHub <https://github.com/macrocosme/shwirl>`_. This can be done from
+GitHub itself using buttons, or via git (e.g. `git clone https://github.com/macrocosme/shwirl.git`).
+
+Once everything is installed/downloaded, you should be able to start **shwirl**'s the Graphical User Interface (GUI) via something like:
+
+.. code:: console
+
+  python3 shwirl.py
+
 Python 2.7 / PyQt4 users
 ------------------------
 PyQt4 (and Python 2.7) are also supported.
