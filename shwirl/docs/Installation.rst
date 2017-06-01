@@ -45,5 +45,24 @@ Python 2.7 / PyQt4 users
 ------------------------
 PyQt4 (and Python 2.7) are also supported.
 
+Installing PyQt5 from scratch (example)
+---------------------------------------
+N.B. The following will vary depending on your OS and your different setings.
 
+Download sip `here <https://www.riverbankcomputing.com/software/pyqt/download5>`_.
 
+.. code:: console
+
+  cd sip-4.19.1/
+  python3 configure.py
+  sudo make
+  sudo make install
+
+Download PyQt5 from the same `location <https://www.riverbankcomputing.com/software/pyqt/download>`_.
+
+.. code:: console
+
+  cd PyQt5_gpl-5.8.1/
+  sudo python3 configure.py --qmake /home/ubuntu/Qt5.7.0/5.7/gcc_64/bin/qmake --sip-incdir /usr/include/python3.4m py_inc_dir=/usr/include/python3.4m
+  sudo make
+  sudo make install
