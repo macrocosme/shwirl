@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division
+from __future__ import division, print_function
 
 # Basic imports
 import sys
@@ -62,13 +62,14 @@ class MainWindow(QMainWindow):
         # splitter_h.addWidget(splitter_v)
 
         # Menus / viz options
-        self.widget_types = ['load_button', 'view', 'rendering_params', 'filtering', 'smoothing', 'image']
+        self.widget_types = ['load_button', 'view', 'rendering_params', 'filtering', 'smoothing', 'image', 'line_ratio']
         self.widget_types_text = {'load_button': 'Import',
                                   'view': 'Camera and transforms',
                                   'rendering_params': 'Colour',
                                   'filtering': 'Filter',
                                   'smoothing': 'Smooth',
-                                  'image': 'Export'}
+                                  'image': 'Export',
+                                  'line_ratio': 'Line Ratio'}
 
         self.props = {}
         toolbox = QToolBox()
@@ -88,6 +89,10 @@ class MainWindow(QMainWindow):
 
         # Connect signals (events handling)
         self.props['load_button'].signal_file_loaded.connect(self.load_volume)
+        self.props['line_ratio'].signal_file2_loaded.connect(self.load_volume2)
+        self.props['line_ratio'].signal_compute_ratio_changed.connect(self.update_compute_ratio)
+        self.props['line_ratio'].signal_show_vol2_changed.connect(self.update_show_vol2)
+
 
         # self.props['load_button'].signal_objet_changed.connect(self.update_rendering_param)
         self.props['view'].signal_objet_changed.connect(self.update_rendering_param)
@@ -128,6 +133,15 @@ class MainWindow(QMainWindow):
 
             self.update_rendering_param()
             self.update_view()
+
+    def load_volume2(self):
+        self.Canvas3D.set_data2(self.props['line_ratio'].loaded_cube2)
+
+    def update_compute_ratio(self):
+        self.Canvas3D.set_compute_ratio(self.props['line_ratio'].combo_compute_ratio.currentText())
+
+    def update_show_vol2(self):
+        self.Canvas3D.set_show_vol2(self.props['line_ratio'].l_show_vol2_value.text())
 
     def update_rendering_param(self):
         # tf_method, cmap
@@ -246,6 +260,9 @@ class ObjectWidget(QWidget):
     """
     signal_objet_changed = pyqtSignal(name='objectChanged')
     signal_file_loaded = pyqtSignal(name='fileLoaded')
+    signal_file2_loaded = pyqtSignal(name='file2Loaded')
+    signal_compute_ratio_changed = pyqtSignal(name='compute_ratioChanged')
+    signal_show_vol2_changed = pyqtSignal(name='show_vol2Changed')
     signal_camera_changed = pyqtSignal(name='cameraChanged')
     signal_fov_changed = pyqtSignal(name='fovChanged')
     signal_autorotate_changed = pyqtSignal(name='autorotateChanged')
@@ -285,6 +302,40 @@ class ObjectWidget(QWidget):
             self.load_button.clicked.connect(self.showDialog)
             array = [self.load_button]
             serialize_widgets('fits_button', '', array)
+
+        elif type == 'line_ratio':
+            self.load_button2 = QPushButton("Load", self)
+            self.load_button2.clicked.connect(self.showDialog2)
+            array = [self.load_button2]
+            serialize_widgets('fits_button2', '', array)
+
+            l_compute_ratio = QLabel("Analysis")
+            # self.l_compute_ratio = ['mip', 'translucent', 'translucent2', 'iso', 'additive']
+            self.compute_ratio = ['',
+                                  'log(A/B)',
+                                  #'B/A',
+                                  'abs(A-B)']
+            self.combo_compute_ratio = QComboBox(self)
+            self.combo_compute_ratio.addItems(self.compute_ratio)
+            self.combo_compute_ratio.currentIndexChanged.connect(self.update_compute_ratio)
+            array = [l_compute_ratio, self.combo_compute_ratio]
+            serialize_widgets('compute_ratio', '', array)
+
+            # self.chk_compute_ratio = QCheckBox("log(A/B)")
+            # self.chk_compute_ratio.setChecked(False)
+            # self.chk_compute_ratio.stateChanged.connect(self.update_compute_ratio)
+            # array = [self.chk_compute_ratio]
+            # serialize_widgets('compute_ratio', '', array)
+
+            l_show_vol2 = QLabel("VolSelect ")
+            self.slider_show_vol2 = QSlider(Qt.Horizontal, self)
+            self.slider_show_vol2.setMinimum(0)
+            self.slider_show_vol2.setMaximum(10000)
+            self.slider_show_vol2.setValue(0)
+            self.l_show_vol2_value = QLineEdit(str(self.slider_show_vol2.value()))
+            self.slider_show_vol2.valueChanged.connect(self.update_show_vol2)
+            array = [l_show_vol2, self.slider_show_vol2, self.l_show_vol2_value]
+            serialize_widgets('show_vol2', '', array)
 
         elif type == 'view':
             l_cam = QLabel("camera ")
@@ -548,21 +599,16 @@ class ObjectWidget(QWidget):
 
     def showDialog(self):
         filename = QFileDialog.getOpenFileName(self,
-                                                         'Open file',
-                                                         filter='FITS Images (*.fits, *.FITS)')
-        # '/Users/danyvohl/code/data')
+                                               'Open file',
+                                               filter='FITS Images (*.fits, *.FITS)')
 
         if filename[0] != "":
             # Load file
-            # print(filename)
             self.loaded_cube = fits.open(filename[0])
 
             try:
                 self.vol_min = self.loaded_cube[0].header["DATAMIN"]
                 self.vol_max = self.loaded_cube[0].header["DATAMAX"]
-
-                # print("DATAMIN", self.vol_min)
-                # print("DATAMAX", self.vol_max)
             except:
                 # print("Warning: DATAMIN and DATAMAX not present in header; evaluating min and max")
                 if self.loaded_cube[0].header["NAXIS"] == 3:
@@ -572,17 +618,31 @@ class ObjectWidget(QWidget):
                     self.vol_min = np.nanmin(self.loaded_cube[0].data[0])
                     self.vol_max = np.nanmax(self.loaded_cube[0].data[0])
 
-            # # Will trigger update clim
-            # self.l_clim_min.setText(str(min))
-            # self.l_clim_max.setText(str(max))
-
-            # for widgets in self.widgets_array:
-            #     for widget in widgets:
-            #         widget.setEnabled(True)
-
             self.signal_file_loaded.emit()
-            # self.signal_objet_changed.emit()
-            # self.signal_camera_changed.emit()
+
+    # Dumb method to get something done quickly. Should be some sort of array instead using showDialog only.
+    def showDialog2(self):
+        filename = QFileDialog.getOpenFileName(self,
+                                               'Open file',
+                                               filter='FITS Images (*.fits, *.FITS)')
+
+        if filename[0] != "":
+            # Load file
+            self.loaded_cube2 = fits.open(filename[0])
+
+            try:
+                self.vol_min2 = self.loaded_cube2[0].header["DATAMIN"]
+                self.vol_max2 = self.loaded_cube2[0].header["DATAMAX"]
+            except:
+                # print("Warning: DATAMIN and DATAMAX not present in header; evaluating min and max")
+                if self.loaded_cube2[0].header["NAXIS"] == 3:
+                    self.vol_min2 = np.nanmin(self.loaded_cube2[0].data)
+                    self.vol_max2 = np.nanmax(self.loaded_cube2[0].data)
+                else:
+                    self.vol_min2 = np.nanmin(self.loaded_cube2[0].data[0])
+                    self.vol_max2 = np.nanmax(self.loaded_cube2[0].data[0])
+
+            self.signal_file2_loaded.emit()
 
     def update_discard_filter_text(self, min, max):
         # Update label
@@ -617,6 +677,19 @@ class ObjectWidget(QWidget):
 
     def update_autorotate(self):
         self.signal_autorotate_changed.emit()
+
+    def update_compute_ratio(self):
+        self.signal_compute_ratio_changed.emit()
+
+    def update_show_vol2(self):
+        scaled_value = self.format_digits(self.scale_value(self.slider_show_vol2.value(),
+                                                           self.slider_show_vol2.minimum(),
+                                                           self.slider_show_vol2.maximum(),
+                                                           0.,
+                                                           1.))
+
+        self.l_show_vol2_value.setText(str(scaled_value))
+        self.signal_show_vol2_changed.emit()
 
     # def update_log_scale(self):
     #     self.signal_log_scale_changed.emit()
@@ -928,42 +1001,11 @@ class Canvas3D(scene.SceneCanvas):
 
         try:
             # Quick fix -- will need to be a bit more clever.
-            # print cube[0].data.shape
-            # if len(cube[0].data.shape) == 4:
-            #     # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-            #     data = cube[0].data[0][:2048,:2048,:2048]
-            #     self.clim_vel = 0, cube[0].data[0].shape[0]
-            # else:
-            #     # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-            #     data = cube[0].data[:2048,:2048,:2048]
-            #     self.clim_vel = 0, cube[0].data.shape[0]
-            #
-            # try:
-            #     self.bunit = cube[0].header['BUNIT']
-            # except:
-            #     self.bunit = "unknown"
-            #
-            # try:
-            #     self.vel = cube[0].header['CTYPE3']
-            # except:
-            #     self.vel = "unknown"
+            data = self.parse_data_to_3D_only(cube)
 
-            # print(cube[0].data.shape)
             if len(cube[0].data.shape) == 4:
-                # Test
-                # cube[0].data = np.swapaxes(cube[0].data, 0, 1)
-
-
-                # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-                data = cube[0].data[0][:2048, :2048, :2048]
-                # data = cube[0].data[0][75:150, 110:150, 100:150]
-
                 self.vel_axis = cube[0].data[0].shape[0]
             else:
-                # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-                data = cube[0].data[:2048, :2048, :2048]
-                # data = cube[0].data[:,60:-60,:]
-                # data = cube[0].data[:, :, :]
                 self.vel_axis = cube[0].data.shape[0]
 
             try:
@@ -1034,7 +1076,7 @@ class Canvas3D(scene.SceneCanvas):
                 self.vel_val = "Undefined"
                 # print("self.clim_vel", self.clim_vel)
 
-            data = np.flipud(np.rollaxis(data, 1))
+
 
             self.volume = RenderVolume(data,
                                        parent=self.view.scene,
@@ -1181,6 +1223,18 @@ class Canvas3D(scene.SceneCanvas):
 
         return vertices, filled, outline
 
+    def parse_data_to_3D_only(self, cube):
+        if len(cube[0].data.shape) == 4:
+            # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
+            data = cube[0].data[0][:2048, :2048, :2048]
+        else:
+            # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
+            data = cube[0].data[:2048, :2048, :2048]
+
+        data = np.flipud(np.rollaxis(data, 1))
+
+        return data
+
     # def set_data(self, data, tf_method, cmap, clim_min, clim_max):
     def set_data(self, tf_method, cmap, combo_color_method, interpolation_method):
         self.volume.method = tf_method
@@ -1188,6 +1242,9 @@ class Canvas3D(scene.SceneCanvas):
         self.volume.color_method = combo_color_method
         self.volume.interpolation = interpolation_method
 
+        self.set_cbar_label_str(cmap)
+
+    def set_cbar_label_str(self, cmap=None):
         # print(self.volume.color_method)
         if (self.volume.color_method == 0):
             label = str(self.bunit)
@@ -1198,13 +1255,58 @@ class Canvas3D(scene.SceneCanvas):
             # print("label", label)
             clim = self.clim_vel
 
-        # print ('clim', clim)
-
         self.cbar.clim = clim
         self.cbar.label_str = label
-        self.cbar.cmap = cmap
+
+        if cmap != None:
+            self.cbar.cmap = cmap
 
         # self.volume.set_data(data, [clim_min, clim_max])
+
+    def set_compute_ratio(self, compute_ratio):
+        """
+        set_compute_ratio
+        
+        :param compute_ratio: value of compute_ratio dropdown menu 
+        :return: nothing.
+        """
+        # self.volume.relative_step_size = 0.2
+        self.volume.compute_ratio = compute_ratio
+
+        if compute_ratio != '':
+            self.cbar.label_str = compute_ratio
+        else:
+            self.set_cbar_label_str()
+            
+        if compute_ratio == 'log(A/B)':
+            self.cbar.clim = [0.77,1.53]
+
+        # if compute_ratio == 'log(A/B)':
+        #     self.previous_clim = self.cbar.clim
+        #     self.cbar.clim = [self.data_min/self.data2_min, self.data_max/self.data2_max]
+        #
+        # else:
+        #     self.cbar.clim = self.previous_clim
+
+    def set_show_vol2(self, show_vol2):
+        """
+        set_show_vol2
+        
+        :param show_vol2:  Value used to blend the two volumes (0: all volume 1; 1: all volume 2; 0 < x < 1: blending)
+        :return: nothing
+        """
+        # self.volume.relative_step_size = 0.2
+        self.volume.show_vol2 = show_vol2
+
+    def set_data2(self, cube):
+        data = self.parse_data_to_3D_only(cube)
+
+        # self.data2_min = data.min()
+        # self.data2_max = data.max()
+
+        self.unfreeze()
+        self.volume.data2 = data
+        self.freeze()
 
     def set_threshold(self, threshold):
         try:

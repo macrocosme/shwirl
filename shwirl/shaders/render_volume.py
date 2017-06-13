@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, print_function
 
 # This file implements a RenderVolumeVisual class. It is derived from the
 # VolumeVisual class in vispy.visuals.volume, which is released under a BSD
@@ -86,6 +86,8 @@ void main() {
 FRAG_SHADER = """
 // uniforms
 uniform $sampler_type u_volumetex;
+uniform $sampler_type u_volumetex2;
+
 uniform vec3 u_shape;
 uniform vec3 u_resolution;
 uniform float u_threshold;
@@ -102,6 +104,8 @@ uniform int u_filter_type;
 
 uniform int u_use_gaussian_filter;
 uniform int u_gaussian_filter_size;
+uniform int u_compute_ratio;
+uniform float u_show_vol2;
 
 //uniform int u_log_scale;
 
@@ -309,6 +313,49 @@ vec4 calculateColor(vec4 betterColor, vec3 loc, vec3 step)
     return final_color;
 }}
 
+vec4 filter_data(vec4 colour, float low_discard_ratio, float discard_ratio)
+{{
+    if (u_filter_type == 1) {{
+        // Get rid of very strong signal values
+        if (colour.g > u_high_discard_filter_value)
+        {{
+            colour = vec4(0.,0.,0.,0.);
+        }}
+
+        // Don't consider noisy values
+        //if (val < u_volume_mean - 3*u_volume_std)
+        if (colour.g < u_low_discard_filter_value)
+        {{
+            colour = vec4(0.,0.,0.,0.);
+        }}
+
+        if (u_low_discard_filter_value == u_high_discard_filter_value)
+        {{
+            if (u_low_discard_filter_value != 0.)
+            {{
+                colour *= low_discard_ratio;
+            }}
+        }}
+        else {{
+            colour -= u_low_discard_filter_value;
+            colour *= discard_ratio;
+        }}
+    }}
+    else {{
+        if (colour.g > u_high_discard_filter_value)
+        {{
+            colour = vec4(0.,0.,0.,0.);
+        }}
+
+        if (colour.g < u_low_discard_filter_value)
+        {{
+            colour = vec4(0.,0.,0.,0.);
+        }}
+    }}
+    
+    return colour;
+}}
+
 // for some reason, this has to be the last function in order for the
 // filters to be inserted in the correct place...
 
@@ -355,6 +402,8 @@ void main() {{
     float discard_ratio = 1.0 / (u_high_discard_filter_value - u_low_discard_filter_value);
     float low_discard_ratio = 1.0 / u_low_discard_filter_value;
 
+    vec4 colour_cube1;
+    vec4 colour_cube2;
 
     for (iter=0; iter<nsteps; iter++)
     {{
@@ -362,9 +411,77 @@ void main() {{
         vec4 color;
 
         if (u_filter_size == 1)
-            color = $sample(u_volumetex, loc);
+        {{
+            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
+            colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+            if (u_compute_ratio == 0)
+            {{
+                color = (1.0-u_show_vol2)*colour_cube1;
+                color += u_show_vol2*colour_cube2;
+            }}
+            else
+            {{
+                if (u_compute_ratio == 1)
+                {{
+                    //if (colour_cube1.g != 0. && colour_cube2.g != 0.)
+                    if (colour_cube2.g > 0.)
+                    {{
+                        /*
+                        if (colour_cube2.g > 0.000001)
+                            color = (colour_cube1/colour_cube2)-0.000001;
+                        else
+                            color = (colour_cube1/0.000001)-0.00001;
+                        
+                        color /= 1000000.0-0.000001;
+                        */
+                        
+                        color = log(colour_cube1/colour_cube2)/log(10);//-0.77467291830337426;
+                    }}
+                    else
+                    {{
+                        color = vec4(0.,0.,0.,0.);
+                    }}
+                    /*
+                    if (colour_cube2.g != 0)
+                        color = log(colour_cube1/colour_cube2);
+                    else
+                        color = vec4(0.,0.,0.,0.);
+                    */
+                }}
+                else 
+                {{
+                    if (u_compute_ratio == 2)
+                    {{
+                        if (colour_cube1.g != 0. && colour_cube2.g != 0.)
+                        {{
+                            if (colour_cube1.g > 0.000001)
+                                color = (colour_cube2/colour_cube1)-0.000001;
+                            else
+                                color = (colour_cube1/0.000001)-0.00001;
+                            
+                            color /= 1000000.0-0.000001;
+                            /*
+                            if (colour_cube1.g != 0)
+                                color = log(colour_cube2/colour_cube1);
+                            else
+                                color = vec4(0.,0.,0.,0.);
+                            */
+                        }}
+                        else
+                        {{
+                            color = vec4(0.,0.,0.,0.);
+                        }}
+                    }}
+                    else
+                    {{
+                        color = abs(colour_cube1-colour_cube2);
+                    }}
+                }}
+            }}
+        }}
         else {{
             color = movingAverageFilter_line_of_sight(loc, step);
+            color = filter_data(color, low_discard_ratio, discard_ratio);
         }}
 
         if (u_use_gaussian_filter==1) {{
@@ -411,51 +528,13 @@ void main() {{
                 direction = vec3(0., 0., 1.);
                 temp_color = Gaussian_13(temp_color, loc, direction);
             }}
-            color = temp_color;
+            color = filter_data(temp_color, low_discard_ratio, discard_ratio);
         }}
 
         float val = color.g;
 
         // To force activating the uniform - this should be done differently
         float density_factor = u_density_factor;
-
-        if (u_filter_type == 1) {{
-            // Get rid of very strong signal values
-            if (val > u_high_discard_filter_value)
-            {{
-                val = 0.;
-            }}
-
-            // Don't consider noisy values
-            //if (val < u_volume_mean - 3*u_volume_std)
-            if (val < u_low_discard_filter_value)
-            {{
-                val = 0.;
-            }}
-
-            if (u_low_discard_filter_value == u_high_discard_filter_value)
-            {{
-                if (u_low_discard_filter_value != 0.)
-                {{
-                    val *= low_discard_ratio;
-                }}
-            }}
-            else {{
-                val -= u_low_discard_filter_value;
-                val *= discard_ratio;
-            }}
-        }}
-        else {{
-            if (val > u_high_discard_filter_value)
-            {{
-                val = 0.;
-            }}
-
-            if (val < u_low_discard_filter_value)
-            {{
-                val = 0.;
-            }}
-        }}
 
         {in_loop}
 
@@ -499,14 +578,84 @@ MIP_SNIPPETS = dict(
         loc = start_loc + step * (float(maxi) - 0.5);
 
         for (int i=0; i<10; i++) {
-            maxval = max(maxval, $sample(u_volumetex, loc).g);
+            if (u_compute_ratio == 0)
+            {{
+                maxval = max(maxval, ((1.0-u_show_vol2)*$sample(u_volumetex, loc).g) + 
+                                     (u_show_vol2*$sample2(u_volumetex2, loc).g));
+            }}
+            else
+            {{
+                if (u_compute_ratio == 1)
+                {{
+                    //if (colour_cube1.g != 0. && colour_cube2.g != 0.)
+                    if (colour_cube2.g > 0.)
+                    {{
+                        /*
+                        if ($sample2(u_volumetex2, loc).g > 0.000001)
+                        {{
+                            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
+                            colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+                            maxval = max(maxval, ((colour_cube1.g/colour_cube2.g)-0.000001)/1000000.0-0.00001);
+                        }}
+                        else
+                        {{
+                            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
+                            maxval = max(maxval, ((colour_cube1.g/0.000001)-0.000001)/(1000000.0-0.000001));
+                        }}
+                        */
+                        
+                        colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
+                        colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+                        
+                        maxval = max(maxval, log(colour_cube1.g/colour_cube2.g)/log(10));//-0.77467291830337426);
+                    }}
+
+                    /*
+                    if ($sample2(u_volumetex2, loc).g != 0)
+                        maxval = max(maxval, log($sample(u_volumetex, loc).g/$sample2(u_volumetex2, loc).g));
+                    else
+                        maxval = max(maxval, 0.);
+                    */
+                }}
+                else{{
+                    if (u_compute_ratio == 2)
+                    {{
+                        if (colour_cube1.g != 0. && colour_cube2.g != 0.)
+                        {{
+                            if ($sample(u_volumetex, loc).g > 0.000001)
+                            {{
+                                colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
+                                colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+                                maxval = max(maxval, ((colour_cube2.g/colour_cube1.g)-0.000001)/1000000.0-0.00001);
+                            }}
+                            else
+                            {{
+                                colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+                                maxval = max(maxval, ((colour_cube2.g/0.000001)-0.000001)/(1000000.0-0.000001));
+                            }}
+                        }}
+                        /*
+                        if ($sample(u_volumetex, loc).g != 0)
+                            maxval = max(maxval, log($sample2(u_volumetex2, loc).g/$sample(u_volumetex, loc).g));
+                        else
+                            maxval = max(maxval, 0.);
+                        */
+                    }}
+                    else 
+                    {{
+                        colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
+                        colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+                        maxval = max(maxval, abs(colour_cube1.g-colour_cube2.g));
+                    }}
+                }}
+            }}
             loc += step * 0.1;
         }
 
-        if (maxval > u_high_discard_filter_value || maxval < u_low_discard_filter_value)
+        /*if (maxval > u_high_discard_filter_value || maxval < u_low_discard_filter_value)
         {{
             maxval = 0.;
-        }}
+        }}*/
 
         // Color is associated to voxel intensity
         if (u_color_method == 0) {
@@ -868,7 +1017,7 @@ class RenderVolumeVisual(Visual):
                  filter_type = 0, filter_size = 1,
                  use_gaussian_filter = False, gaussian_filter_size=9,
                  density_factor=0.01, color_method='Moment 0', log_scale=0,
-                 interpolation='linear'):
+                 interpolation='linear', compute_ratio=False, show_vol2=0.):
 
         tex_cls = TextureEmulated3D if emulate_texture else Texture3D
 
@@ -931,12 +1080,16 @@ class RenderVolumeVisual(Visual):
         self._tex = tex_cls((10, 10, 10), interpolation=interpolation,
                             wrapping='clamp_to_edge')
 
+        self._tex2 = tex_cls((10, 10, 10), interpolation=interpolation,
+                            wrapping='clamp_to_edge')
+
         # self._tex = tex_cls((10, 10, 10), interpolation='linear',
         #                     wrapping='clamp_to_edge')
 
         # Create program
         Visual.__init__(self, vcode=VERT_SHADER, fcode="")
         self.shared_program['u_volumetex'] = self._tex
+        self.shared_program['u_volumetex2'] = self._tex2
         self.shared_program['a_position'] = self._vertices
         self.shared_program['a_texcoord'] = self._texcoord
         self._draw_mode = 'triangle_strip'
@@ -966,6 +1119,8 @@ class RenderVolumeVisual(Visual):
         self.log_scale = log_scale
         self.density_factor = density_factor
         self.color_method = color_method
+        self.compute_ratio = compute_ratio
+        self.show_vol2 = show_vol2
 
         self.threshold = threshold if (threshold is not None) else vol.mean()
         # print ("threshold", self.threshold)
@@ -996,6 +1151,8 @@ class RenderVolumeVisual(Visual):
         if self._clim is None:
             self._clim = np.nanmin(vol), np.nanmax(vol)
 
+        print (self._clim)
+
         # Apply clim
         vol = np.flipud(np.array(vol, dtype='float32', copy=False))
         if self._clim[1] == self._clim[0]:
@@ -1008,6 +1165,8 @@ class RenderVolumeVisual(Visual):
         # Deal with nan
         if np.isnan(vol).any():
             vol = np.nan_to_num(vol)
+
+        print('Vol1 min:', vol.min(), 'max:', vol.max())
 
         self.high_discard_filter_value = self._clim[1]
         self.low_discard_filter_value = self._clim[0]
@@ -1032,6 +1191,80 @@ class RenderVolumeVisual(Visual):
 
         # Get some stats
         self._kb_for_texture = np.prod(self._vol_shape) / 1024
+
+    @property
+    def data2(self):
+        return self._tex2
+
+    @data2.setter
+    def data2(self, vol, clim=None):
+        self.set_data2(vol, clim=None)
+
+    def set_data2(self, vol, clim=None):
+        """ Set the volume data.
+
+        Parameters
+        ----------
+        vol : ndarray
+            The 3D volume.
+        clim : tuple | None
+            Colormap limits to use. None will use the min and max values.
+        """
+        # Check volume
+        if not isinstance(vol, np.ndarray):
+            raise ValueError('Volume visual needs a numpy array.')
+        if not ((vol.ndim == 3) or (vol.ndim == 4 and vol.shape[-1] <= 4)):
+            raise ValueError('Volume visual needs a 3D image.')
+
+        # Handle clim
+        if clim is not None:
+            clim = np.array(clim, float)
+            if not (clim.ndim == 1 and clim.size == 2):
+                raise ValueError('clim must be a 2-element array-like')
+            _clim = tuple(clim)
+        if clim is None:
+            _clim = self._clim[0], self._clim[1] #
+            #_clim =  np.nanmin(vol), np.nanmax(vol)
+
+        # Apply clim
+        vol = np.flipud(np.array(vol, dtype='float32', copy=False))
+        if _clim[1] == _clim[0]:
+            if _clim[0] != 0.:
+                vol *= 1.0 / _clim[0]
+        else:
+            # This should be also applied to the first volume...
+            vol -= min(_clim[0], np.nanmin(vol))
+            vol /= max(_clim[1], np.nanmax(vol)) - min(_clim[0], np.nanmin(vol))
+
+        # Deal with nan
+        if np.isnan(vol).any():
+            vol = np.nan_to_num(vol)
+
+        print ('Vol2 min:', vol.min(), 'max:', vol.max())
+
+        self.high_discard_filter_value = _clim[1]
+        self.low_discard_filter_value = _clim[0]
+
+        # self.volume_mean = np.mean(vol)
+        # self.volume_std = np.std(vol)
+        # self.volume_madfm = self.madfm(vol)
+
+        # Apply to texture
+        self._tex2.set_data(vol)  # will be efficient if vol is same shape
+        # self.shared_program['u_shape2'] = (vol.shape[2], vol.shape[1],
+        #                                   vol.shape[0])
+        #
+        # self.shared_program['u_resolution2'] = (1/vol.shape[2], 1/vol.shape[1],
+        #                                   1/vol.shape[0])
+
+        # shape = vol.shape[:3]
+        # if self._vol_shape2 != shape:
+        #     self._vol_shape2 = shape
+        #     self._need_vertex_update = True
+        # self._vol_shape2 = shape
+
+        # Get some stats
+        # self._kb_for_texture2 = np.prod(self._vol_shape2) / 1024
 
     @property
     def interpolation(self):
@@ -1094,6 +1327,7 @@ class RenderVolumeVisual(Visual):
         self.shared_program.frag = frag_dict[method]
         self.shared_program.frag['sampler_type'] = self._tex.glsl_sampler_type
         self.shared_program.frag['sample'] = self._tex.glsl_sample
+        self.shared_program.frag['sample2'] = self._tex2.glsl_sample
         self.shared_program.frag['cmap'] = Function(self._cmap.glsl_map)
         self.update()
 
@@ -1318,6 +1552,54 @@ class RenderVolumeVisual(Visual):
         self.shared_program['u_density_factor'] = self._density_factor
 
         self.update()
+
+    @property
+    def compute_ratio(self):
+        return self._compute_ratio
+
+    @compute_ratio.setter
+    def compute_ratio(self, compute_ratio=False):
+
+        if compute_ratio == 'log(A/B)':
+            self._compute_ratio = 1
+        elif compute_ratio == 'B/A':
+            self._compute_ratio = 2
+        elif compute_ratio == 'abs(A-B)':
+            self._compute_ratio = 3
+        else:
+            self._compute_ratio = 0
+
+        self.shared_program['u_compute_ratio'] = int(self._compute_ratio)
+
+        self.update()
+
+    @property
+    def show_vol2(self):
+        return self._show_vol2
+
+    @show_vol2.setter
+    def show_vol2(self, show_vol2):
+        self._show_vol2 = show_vol2
+        self.shared_program['u_show_vol2'] = float(self._show_vol2)
+        self.update()
+
+    @property
+    def min_ratio(self):
+        return self._min_ratio
+
+    @min_ratio.setter
+    def min_ratio(self, min_ratio):
+        self._min_ratio = min_ratio
+        self.shared_program['u_min_ratio'] = float(self._min_ratio)
+
+    @property
+    def max_ratio(self):
+        return self._max_ratio
+
+    @max_ratio.setter
+    def max_ratio(self, max_ratio):
+        self._max_ratio = max_ratio
+        self.shared_program['u_max_ratio'] = float(self._max_ratio)
 
     @property
     def relative_step_size(self):
