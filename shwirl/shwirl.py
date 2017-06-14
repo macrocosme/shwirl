@@ -312,8 +312,8 @@ class ObjectWidget(QWidget):
             l_compute_ratio = QLabel("Analysis")
             # self.l_compute_ratio = ['mip', 'translucent', 'translucent2', 'iso', 'additive']
             self.compute_ratio = ['',
-                                  'log(A/B)',
-                                  #'B/A',
+                                  'log(A/B) (1)',
+                                  'log(A/B) (2)',
                                   'abs(A-B)']
             self.combo_compute_ratio = QComboBox(self)
             self.combo_compute_ratio.addItems(self.compute_ratio)
@@ -1003,6 +1003,8 @@ class Canvas3D(scene.SceneCanvas):
             # Quick fix -- will need to be a bit more clever.
             data = self.parse_data_to_3D_only(cube)
 
+            self.data_shape = data.shape
+
             if len(cube[0].data.shape) == 4:
                 self.vel_axis = cube[0].data[0].shape[0]
             else:
@@ -1277,9 +1279,10 @@ class Canvas3D(scene.SceneCanvas):
             self.cbar.label_str = compute_ratio
         else:
             self.set_cbar_label_str()
-            
-        if compute_ratio == 'log(A/B)':
-            self.cbar.clim = [0.77,1.53]
+
+        if compute_ratio == 'log(A/B) (1)' or compute_ratio == 'log(A/B) (2)':
+            self.cbar.clim = [0.77, 1.53]
+            self.cbar.label_str = 'log(CO/CNhi)'
 
         # if compute_ratio == 'log(A/B)':
         #     self.previous_clim = self.cbar.clim
@@ -1303,6 +1306,16 @@ class Canvas3D(scene.SceneCanvas):
 
         # self.data2_min = data.min()
         # self.data2_max = data.max()
+
+
+        from scipy.ndimage import zoom
+
+        zoom_array = [self.data_shape[0] / data.shape[0],
+                      self.data_shape[1] / data.shape[1],
+                      self.data_shape[2] / data.shape[2]]
+        data = zoom(data, zoom_array)
+
+        print (data.shape)
 
         self.unfreeze()
         self.volume.data2 = data

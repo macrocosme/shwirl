@@ -356,6 +356,18 @@ vec4 filter_data(vec4 colour, float low_discard_ratio, float discard_ratio)
     return colour;
 }}
 
+vec4 log10 (vec4 value) {{
+
+    return log(value)/log(10);
+
+}}
+
+float log10 (float value) {{
+
+    return log(value)/log(10);
+
+}}
+
 // for some reason, this has to be the last function in order for the
 // filters to be inserted in the correct place...
 
@@ -404,12 +416,16 @@ void main() {{
 
     vec4 colour_cube1;
     vec4 colour_cube2;
+    
+    // Get sample color
+    vec4 color;
+    vec4 color2;
+    
+    float val1;
+    float val2;
 
     for (iter=0; iter<nsteps; iter++)
     {{
-        // Get sample color
-        vec4 color;
-
         if (u_filter_size == 1)
         {{
             colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
@@ -421,56 +437,25 @@ void main() {{
             }}
             else
             {{
+                // Technique 1: Compute the ratio on a voxel by voxel basis
                 if (u_compute_ratio == 1)
                 {{
-                    //if (colour_cube1.g != 0. && colour_cube2.g != 0.)
-                    if (colour_cube2.g > 0.)
-                    {{
-                        /*
-                        if (colour_cube2.g > 0.000001)
-                            color = (colour_cube1/colour_cube2)-0.000001;
-                        else
-                            color = (colour_cube1/0.000001)-0.00001;
-                        
-                        color /= 1000000.0-0.000001;
-                        */
-                        
-                        color = log(colour_cube1/colour_cube2)/log(10);//-0.77467291830337426;
+                    if (colour_cube1.g > 0. && colour_cube2.g > 0.)
+                    {{                       
+                        color = log10(colour_cube1/colour_cube2);
                     }}
                     else
                     {{
                         color = vec4(0.,0.,0.,0.);
                     }}
-                    /*
-                    if (colour_cube2.g != 0)
-                        color = log(colour_cube1/colour_cube2);
-                    else
-                        color = vec4(0.,0.,0.,0.);
-                    */
                 }}
                 else 
                 {{
+                    // Technique 2: Computes the ratio in the after_loop portion only
                     if (u_compute_ratio == 2)
                     {{
-                        if (colour_cube1.g != 0. && colour_cube2.g != 0.)
-                        {{
-                            if (colour_cube1.g > 0.000001)
-                                color = (colour_cube2/colour_cube1)-0.000001;
-                            else
-                                color = (colour_cube1/0.000001)-0.00001;
-                            
-                            color /= 1000000.0-0.000001;
-                            /*
-                            if (colour_cube1.g != 0)
-                                color = log(colour_cube2/colour_cube1);
-                            else
-                                color = vec4(0.,0.,0.,0.);
-                            */
-                        }}
-                        else
-                        {{
-                            color = vec4(0.,0.,0.,0.);
-                        }}
+                        val1 = colour_cube1.g;
+                        val2 = colour_cube2.g;
                     }}
                     else
                     {{
@@ -566,12 +551,33 @@ MIP_SNIPPETS = dict(
     before_loop="""
         float maxval = -99999.0; // The maximum encountered value
         int maxi = 0;  // Where the maximum value was encountered
+        
+        // Technique 2: Computes the ratio in the after_loop portion only
+        // Used in line ratio (2)
+        float maxval2 = -99999.0;
+        int maxi2 = 0;
+        
         """,
     in_loop="""
-        if( val > maxval ) {
-            maxval = val;
-            maxi = iter;
-        }
+    
+        if (u_compute_ratio != 2) {{
+            if( val > maxval ) {
+                maxval = val;
+                maxi = iter;
+            }
+        }}
+        // Technique 2: Computes the ratio in the after_loop portion only
+        else {{
+            if( val1 > maxval ) {
+                maxval = val1;
+                maxi = iter;
+            }
+        
+            if( val2 > maxval2 ) {
+                maxval2 = val2;
+                maxi2 = iter;
+            }
+        }}
         """,
     after_loop="""
         // Refine search for max value
@@ -587,59 +593,25 @@ MIP_SNIPPETS = dict(
             {{
                 if (u_compute_ratio == 1)
                 {{
-                    //if (colour_cube1.g != 0. && colour_cube2.g != 0.)
-                    if (colour_cube2.g > 0.)
-                    {{
-                        /*
-                        if ($sample2(u_volumetex2, loc).g > 0.000001)
-                        {{
-                            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
-                            colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
-                            maxval = max(maxval, ((colour_cube1.g/colour_cube2.g)-0.000001)/1000000.0-0.00001);
-                        }}
-                        else
-                        {{
-                            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
-                            maxval = max(maxval, ((colour_cube1.g/0.000001)-0.000001)/(1000000.0-0.000001));
-                        }}
-                        */
-                        
+                    if (colour_cube1.g > 0. && colour_cube2.g > 0.)
+                    {{                        
                         colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
                         colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
                         
-                        maxval = max(maxval, log(colour_cube1.g/colour_cube2.g)/log(10));//-0.77467291830337426);
+                        maxval = max(maxval, log(colour_cube1.g/colour_cube2.g)/log(10));
                     }}
-
-                    /*
-                    if ($sample2(u_volumetex2, loc).g != 0)
-                        maxval = max(maxval, log($sample(u_volumetex, loc).g/$sample2(u_volumetex2, loc).g));
-                    else
-                        maxval = max(maxval, 0.);
-                    */
                 }}
                 else{{
                     if (u_compute_ratio == 2)
                     {{
-                        if (colour_cube1.g != 0. && colour_cube2.g != 0.)
+                        if (colour_cube1.g > 0. && colour_cube2.g > 0.)
                         {{
-                            if ($sample(u_volumetex, loc).g > 0.000001)
-                            {{
-                                colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
-                                colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
-                                maxval = max(maxval, ((colour_cube2.g/colour_cube1.g)-0.000001)/1000000.0-0.00001);
-                            }}
-                            else
-                            {{
-                                colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
-                                maxval = max(maxval, ((colour_cube2.g/0.000001)-0.000001)/(1000000.0-0.000001));
-                            }}
+                            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
+                            colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+                            
+                            maxval = max(maxval, colour_cube1.g);
+                            maxval2 = max(maxval2, colour_cube2.g);
                         }}
-                        /*
-                        if ($sample(u_volumetex, loc).g != 0)
-                            maxval = max(maxval, log($sample2(u_volumetex2, loc).g/$sample(u_volumetex, loc).g));
-                        else
-                            maxval = max(maxval, 0.);
-                        */
                     }}
                     else 
                     {{
@@ -652,15 +624,17 @@ MIP_SNIPPETS = dict(
             loc += step * 0.1;
         }
 
-        /*if (maxval > u_high_discard_filter_value || maxval < u_low_discard_filter_value)
-        {{
-            maxval = 0.;
-        }}*/
-
         // Color is associated to voxel intensity
         if (u_color_method == 0) {
-            gl_FragColor = $cmap(maxval);
-            //gl_FragColor.a = maxval;
+        
+            if (u_compute_ratio != 2) {{
+                
+                gl_FragColor = $cmap(maxval);
+                //gl_FragColor.a = maxval;
+            }}
+            else {{
+                gl_FragColor = $cmap(log10(maxval/maxval2));
+            }}
         }
         else{
             // Color is associated to redshift/velocity
@@ -755,29 +729,63 @@ TRANSLUCENT_SNIPPETS = dict(
         float ratio = 1/nsteps; // final average
         float a1 = 0.;
         float a2 = 0.;
+        
+        
+        // Technique 2: Computes the ratio in the after_loop portion only
+        // Used in line ratio (2)
+        vec4 integrated_color_2 = vec4(0., 0., 0., 0.);
+        float a1_2 = 0.;
+        float a2_2 = 0.;
+        
         """,
     in_loop="""
             float alpha;
             // Case 1: Color is associated to voxel intensity
             if (u_color_method == 0) {
-                /*color = $cmap(val);
-                a1 = integrated_color.a;
-                a2 = val * density_factor * (1 - a1);
-
-                alpha = max(a1 + a2, 0.001);
-
-                integrated_color *= a1 / alpha;
-                integrated_color += color * a2 / alpha;*/
-
-                color = $cmap(val);
-
-                a1 = integrated_color.a;
-                a2 = val * density_factor * (1 - a1);
-
-                alpha = max(a1 + a2, 0.001);
-
-                integrated_color *= a1 / alpha;
-                integrated_color += color * a2 / alpha;
+                if (u_compute_ratio != 2) {{
+                    /*color = $cmap(val);
+                    a1 = integrated_color.a;
+                    a2 = val * density_factor * (1 - a1);
+    
+                    alpha = max(a1 + a2, 0.001);
+    
+                    integrated_color *= a1 / alpha;
+                    integrated_color += color * a2 / alpha;*/
+    
+                    color = $cmap(val);
+    
+                    a1 = integrated_color.a;
+                    a2 = val * density_factor * (1 - a1);
+    
+                    alpha = max(a1 + a2, 0.001);
+    
+                    integrated_color *= a1 / alpha;
+                    integrated_color += color * a2 / alpha;
+                }}
+                //Computing ratio (Method 2)
+                else {{
+                    // 1st Cube   
+                    color = $cmap(val1);
+    
+                    a1 = integrated_color.a;
+                    a2 = val * density_factor * (1 - a1);
+    
+                    alpha = max(a1 + a2, 0.001);
+    
+                    integrated_color *= a1 / alpha;
+                    integrated_color += color * a2 / alpha;
+                
+                    // 2nd Cube    
+                    color2 = $cmap(val2);
+    
+                    a1_2 = integrated_color_2.a;
+                    a2_2 = val * density_factor * (1 - a1_2);
+    
+                    alpha = max(a1_2 + a2_2, 0.001);
+    
+                    integrated_color_2 *= a1_2 / alpha;
+                    integrated_color_2 += color2 * a2_2 / alpha;            
+                }}
 
             }
             else{
@@ -841,7 +849,12 @@ TRANSLUCENT_SNIPPETS = dict(
     after_loop="""
 
         if (u_color_method != 3){
-            gl_FragColor = integrated_color;
+            if (u_compute_ratio != 2) {{
+                gl_FragColor = integrated_color;
+            }}
+            else {{
+                gl_FragColor = integrated_color/integrated_color_2;
+            }}
         }
         else {
             gl_FragColor = $cmap((mom0  * (mom0-mom1 * mom0-mom1)) / mom0);
@@ -1560,9 +1573,9 @@ class RenderVolumeVisual(Visual):
     @compute_ratio.setter
     def compute_ratio(self, compute_ratio=False):
 
-        if compute_ratio == 'log(A/B)':
+        if compute_ratio == 'log(A/B) (1)':
             self._compute_ratio = 1
-        elif compute_ratio == 'B/A':
+        elif compute_ratio == 'log(A/B) (2)':
             self._compute_ratio = 2
         elif compute_ratio == 'abs(A-B)':
             self._compute_ratio = 3
