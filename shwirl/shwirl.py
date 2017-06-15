@@ -1307,18 +1307,17 @@ class Canvas3D(scene.SceneCanvas):
         # self.data2_min = data.min()
         # self.data2_max = data.max()
 
-
-        from scipy.ndimage import zoom
-
-        zoom_array = [self.data_shape[0] / data.shape[0],
-                      self.data_shape[1] / data.shape[1],
-                      self.data_shape[2] / data.shape[2]]
-        data = zoom(data, zoom_array)
+        # from scipy.ndimage import zoom
+        #
+        # zoom_array = [self.data_shape[0] / data.shape[0],
+        #               self.data_shape[1] / data.shape[1],
+        #               self.data_shape[2] / data.shape[2]]
+        # data = zoom(data, zoom_array)
 
         print (data.shape)
 
         self.unfreeze()
-        self.volume.data2 = data
+        self.volume.data2 = [data, self.data_shape]
         self.freeze()
 
     def set_threshold(self, threshold):

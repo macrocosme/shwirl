@@ -768,7 +768,7 @@ TRANSLUCENT_SNIPPETS = dict(
                     color = $cmap(val1);
     
                     a1 = integrated_color.a;
-                    a2 = val * density_factor * (1 - a1);
+                    a2 = val1 * density_factor * (1 - a1);
     
                     alpha = max(a1 + a2, 0.001);
     
@@ -1211,9 +1211,9 @@ class RenderVolumeVisual(Visual):
 
     @data2.setter
     def data2(self, vol, clim=None):
-        self.set_data2(vol, clim=None)
+        self.set_data2(vol[0], vol1_data_shape=vol[1], clim=None)
 
-    def set_data2(self, vol, clim=None):
+    def set_data2(self, vol, vol1_data_shape=None, clim=None):
         """ Set the volume data.
 
         Parameters
@@ -1252,6 +1252,14 @@ class RenderVolumeVisual(Visual):
         # Deal with nan
         if np.isnan(vol).any():
             vol = np.nan_to_num(vol)
+            # vol[np.isnan(vol)] = np.nanmin(vol)
+
+        # Regrid the cube to match vol1.
+        from scipy.ndimage import zoom
+        zoom_array = [vol1_data_shape[0] / vol.shape[0],
+                      vol1_data_shape[1] / vol.shape[1],
+                      vol1_data_shape[2] / vol.shape[2]]
+        vol = zoom(vol, zoom_array)
 
         print ('Vol2 min:', vol.min(), 'max:', vol.max())
 
