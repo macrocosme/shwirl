@@ -115,6 +115,13 @@ uniform float u_show_vol2;
 //uniform float u_volume_madfm;
 uniform float u_high_discard_filter_value;
 uniform float u_low_discard_filter_value;
+
+uniform float u_high_discard_filter_ratio_value;
+uniform float u_low_discard_filter_ratio_value;
+
+uniform float u_ratio_lim_low;
+uniform float u_ratio_lim_high;
+
 uniform float u_density_factor;
 
 uniform int u_color_method;
@@ -313,41 +320,66 @@ vec4 calculateColor(vec4 betterColor, vec3 loc, vec3 step)
     return final_color;
 }}
 
-vec4 filter_data(vec4 colour, float low_discard_ratio, float discard_ratio)
+vec4 filter_data(vec4 colour, float low_discard_ratio, float discard_ratio, int vol_id)
 {{
-    if (u_filter_type == 1) {{
-        // Get rid of very strong signal values
-        if (colour.g > u_high_discard_filter_value)
-        {{
-            colour = vec4(0.,0.,0.,0.);
-        }}
-
-        // Don't consider noisy values
-        //if (val < u_volume_mean - 3*u_volume_std)
-        if (colour.g < u_low_discard_filter_value)
-        {{
-            colour = vec4(0.,0.,0.,0.);
-        }}
-
-        if (u_low_discard_filter_value == u_high_discard_filter_value)
-        {{
-            if (u_low_discard_filter_value != 0.)
+    float low_value;
+    float high_value;
+    if (vol_id == 1){{
+         low_value = u_low_discard_filter_value;
+         high_value = u_high_discard_filter_value;
+    }}
+    else {{
+         low_value = u_low_discard_filter_ratio_value;
+         high_value = u_high_discard_filter_ratio_value;
+    }}
+     
+    if (vol_id == 1) {{
+        if (u_filter_type == 1) {{
+            // Get rid of very strong signal values
+            if (colour.g > high_value)
             {{
-                colour *= low_discard_ratio;
+                colour = vec4(0.,0.,0.,0.);
+            }}
+    
+            // Don't consider noisy values
+            //if (val < u_volume_mean - 3*u_volume_std)
+            if (colour.g < low_value)
+            {{
+                colour = vec4(0.,0.,0.,0.);
+            }}
+    
+            if (low_value == high_value)
+            {{
+                if (low_value != 0.)
+                {{
+                    colour *= low_discard_ratio;
+                }}
+            }}
+            else {{
+                colour -= low_value;
+                colour *= discard_ratio;
             }}
         }}
         else {{
-            colour -= u_low_discard_filter_value;
-            colour *= discard_ratio;
+            if (colour.g > high_value)
+            {{
+                colour = vec4(0.,0.,0.,0.);
+            }}
+    
+            if (colour.g < low_value)
+            {{
+                colour = vec4(0.,0.,0.,0.);
+            }}
         }}
     }}
+    // Filter out mode only supported for volume 2 for now.
     else {{
-        if (colour.g > u_high_discard_filter_value)
+        if (colour.g > high_value)
         {{
             colour = vec4(0.,0.,0.,0.);
         }}
 
-        if (colour.g < u_low_discard_filter_value)
+        if (colour.g < low_value)
         {{
             colour = vec4(0.,0.,0.,0.);
         }}
@@ -366,6 +398,22 @@ float log10 (float value) {{
 
     return log(value)/log(10);
 
+}}
+
+vec4 normalize_ratio(vec4 value) {{
+    
+    value -= u_ratio_lim_low;
+    value /= u_ratio_lim_high-u_ratio_lim_low;
+    
+    return value;
+}}
+
+float normalize_ratio(float value) {{
+    
+    value -= u_ratio_lim_low;
+    value /= u_ratio_lim_high-u_ratio_lim_low;
+    
+    return value;
 }}
 
 // for some reason, this has to be the last function in order for the
@@ -413,6 +461,9 @@ void main() {{
 
     float discard_ratio = 1.0 / (u_high_discard_filter_value - u_low_discard_filter_value);
     float low_discard_ratio = 1.0 / u_low_discard_filter_value;
+    
+    float discard_ratio_2 = 1.0 / (u_high_discard_filter_ratio_value - u_low_discard_filter_ratio_value);
+    float low_discard_ratio_2 = 1.0 / u_low_discard_filter_ratio_value;
 
     vec4 colour_cube1;
     vec4 colour_cube2;
@@ -428,8 +479,9 @@ void main() {{
     {{
         if (u_filter_size == 1)
         {{
-            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
-            colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio, 1);
+            colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio_2, discard_ratio_2, 2);
+            
             if (u_compute_ratio == 0)
             {{
                 color = (1.0-u_show_vol2)*colour_cube1;
@@ -440,9 +492,9 @@ void main() {{
                 // Technique 1: Compute the ratio on a voxel by voxel basis
                 if (u_compute_ratio == 1)
                 {{
-                    if (colour_cube1.g > 0. && colour_cube2.g > 0.)
+                    if (colour_cube2.g > 0.)
                     {{                       
-                        color = log10(colour_cube1/colour_cube2);
+                        color = normalize_ratio(log10(colour_cube1/colour_cube2));
                     }}
                     else
                     {{
@@ -466,7 +518,7 @@ void main() {{
         }}
         else {{
             color = movingAverageFilter_line_of_sight(loc, step);
-            color = filter_data(color, low_discard_ratio, discard_ratio);
+            color = filter_data(color, low_discard_ratio, discard_ratio, 1);
         }}
 
         if (u_use_gaussian_filter==1) {{
@@ -513,7 +565,7 @@ void main() {{
                 direction = vec3(0., 0., 1.);
                 temp_color = Gaussian_13(temp_color, loc, direction);
             }}
-            color = filter_data(temp_color, low_discard_ratio, discard_ratio);
+            color = filter_data(temp_color, low_discard_ratio, discard_ratio, 1);
         }}
 
         float val = color.g;
@@ -593,10 +645,10 @@ MIP_SNIPPETS = dict(
             {{
                 if (u_compute_ratio == 1)
                 {{
-                    if (colour_cube1.g > 0. && colour_cube2.g > 0.)
+                    if (colour_cube2.g > 0.)
                     {{                        
-                        colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
-                        colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+                        colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio, 1);
+                        colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio_2, discard_ratio_2, 2);
                         
                         maxval = max(maxval, log(colour_cube1.g/colour_cube2.g)/log(10));
                     }}
@@ -606,8 +658,8 @@ MIP_SNIPPETS = dict(
                     {{
                         if (colour_cube1.g > 0. && colour_cube2.g > 0.)
                         {{
-                            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
-                            colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+                            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio, 1);
+                            colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio_2, discard_ratio_2, 2);
                             
                             maxval = max(maxval, colour_cube1.g);
                             maxval2 = max(maxval2, colour_cube2.g);
@@ -615,8 +667,8 @@ MIP_SNIPPETS = dict(
                     }}
                     else 
                     {{
-                        colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio);
-                        colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio, discard_ratio);
+                        colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio, 1);
+                        colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio_2, discard_ratio_2, 2);
                         maxval = max(maxval, abs(colour_cube1.g-colour_cube2.g));
                     }}
                 }}
@@ -633,7 +685,7 @@ MIP_SNIPPETS = dict(
                 //gl_FragColor.a = maxval;
             }}
             else {{
-                gl_FragColor = $cmap(log10(maxval/maxval2));
+                gl_FragColor = $cmap(normalize_ratio(log10(maxval/maxval2)));
             }}
         }
         else{
@@ -1037,6 +1089,7 @@ class RenderVolumeVisual(Visual):
         # Storage of information of volume
         self._vol_shape = ()
         self._clim = None
+        self._clim_2 = None
         self._need_vertex_update = True
 
         # Set the colormap
@@ -1155,6 +1208,9 @@ class RenderVolumeVisual(Visual):
         if not ((vol.ndim == 3) or (vol.ndim == 4 and vol.shape[-1] <= 4)):
             raise ValueError('Volume visual needs a 3D image.')
 
+        vol_min = np.nanmin(vol)
+        vol_max = np.nanmax(vol)
+
         # Handle clim
         if clim is not None:
             clim = np.array(clim, float)
@@ -1162,7 +1218,10 @@ class RenderVolumeVisual(Visual):
                 raise ValueError('clim must be a 2-element array-like')
             self._clim = tuple(clim)
         if self._clim is None:
-            self._clim = np.nanmin(vol), np.nanmax(vol)
+            self._clim = vol_min, vol_max
+
+            # Temporarily set clim_2 (2nd volume) to vol1's limits
+            self._clim_2 = vol_min, vol_max
 
         print (self._clim)
 
@@ -1175,6 +1234,8 @@ class RenderVolumeVisual(Visual):
             vol -= self._clim[0]
             vol /= self._clim[1] - self._clim[0]
 
+        self.set_ratio_lim()
+
         # Deal with nan
         if np.isnan(vol).any():
             vol = np.nan_to_num(vol)
@@ -1183,6 +1244,10 @@ class RenderVolumeVisual(Visual):
 
         self.high_discard_filter_value = self._clim[1]
         self.low_discard_filter_value = self._clim[0]
+
+        # Let's just initialize these two with vol1 settings.
+        self.high_discard_filter_ratio_value = self._clim[1]
+        self.low_discard_filter_ratio_value = self._clim[0]
 
         # self.volume_mean = np.mean(vol)
         # self.volume_std = np.std(vol)
@@ -1248,6 +1313,13 @@ class RenderVolumeVisual(Visual):
             # This should be also applied to the first volume...
             vol -= min(_clim[0], np.nanmin(vol))
             vol /= max(_clim[1], np.nanmax(vol)) - min(_clim[0], np.nanmin(vol))
+            # vol -= np.nanmin(vol)
+            # vol /= np.nanmax(vol) - np.nanmin(vol)
+
+        self._clim_2 = min(_clim[0], np.nanmin(vol)), max(_clim[1], np.nanmax(vol))
+        # self._clim_2 = np.nanmin(vol), np.nanmax(vol)
+
+        self.set_ratio_lim()
 
         # Deal with nan
         if np.isnan(vol).any():
@@ -1545,6 +1617,7 @@ class RenderVolumeVisual(Visual):
         self._high_discard_filter_value /= self._clim[1] - self._clim[0]
 
         self.shared_program['u_high_discard_filter_value'] = self._high_discard_filter_value
+        self.set_ratio_lim()
 
         self.update()
 
@@ -1559,9 +1632,78 @@ class RenderVolumeVisual(Visual):
         self._low_discard_filter_value /= self._clim[1] - self._clim[0]
 
         self.shared_program['u_low_discard_filter_value'] = self._low_discard_filter_value
+        self.set_ratio_lim()
 
         self.update()
-        
+
+    def set_ratio_lim(self):
+
+        # Normalized limits
+        try:
+            vol1_low = self.low_discard_filter_value
+            vol1_high = self.high_discard_filter_value
+        except:
+            vol1_low = 0
+            vol1_high = 1
+
+        try:
+            vol2_low = self.low_discard_filter_ratio_value
+            vol2_high = self.high_discard_filter_ratio_value
+        except:
+            vol2_low = 0
+            vol2_high = 1
+
+        if vol2_low != 0:
+            if vol1_low / vol2_low != 0.:
+                self.shared_program['u_ratio_lim_low'] = np.log10(vol1_low/vol2_low)
+            else:
+                self.shared_program['u_ratio_lim_low'] = 1
+        else:
+            self.shared_program['u_ratio_lim_low'] = 1
+
+        if vol2_high != 0:
+            if vol1_high / vol2_high != 0.:
+                self.shared_program['u_ratio_lim_high'] = np.log10(vol1_high / vol2_high)
+            else:
+                self.shared_program['u_ratio_lim_high'] = 1
+        else:
+            self.shared_program['u_ratio_lim_high'] = 1
+
+        self.update()
+
+    @property
+    def high_discard_filter_ratio_value(self):
+        return self._high_discard_filter_ratio_value
+
+    @high_discard_filter_ratio_value.setter
+    def high_discard_filter_ratio_value(self, high_discard_filter_ratio_value):
+        self._high_discard_filter_ratio_value = float(high_discard_filter_ratio_value)
+
+        print ("self._clim_2", self._clim_2)
+
+        self._high_discard_filter_ratio_value -= self._clim_2[0]
+        self._high_discard_filter_ratio_value /= self._clim_2[1] - self._clim_2[0]
+
+        self.shared_program['u_high_discard_filter_ratio_value'] = self._high_discard_filter_ratio_value
+        self.set_ratio_lim()
+
+        self.update()
+
+    @property
+    def low_discard_filter_ratio_value(self):
+        return self._low_discard_filter_ratio_value
+
+    @low_discard_filter_ratio_value.setter
+    def low_discard_filter_ratio_value(self, low_discard_filter_ratio_value):
+        self._low_discard_filter_ratio_value = float(low_discard_filter_ratio_value)
+        self._low_discard_filter_ratio_value -= self._clim_2[0]
+        self._low_discard_filter_ratio_value /= self._clim_2[1] - self._clim_2[0]
+
+        self.shared_program['u_low_discard_filter_ratio_value'] = self._low_discard_filter_ratio_value
+        self.set_ratio_lim()
+
+        self.update()
+    
     @property
     def density_factor(self):
         return self._density_factor
