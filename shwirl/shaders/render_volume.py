@@ -381,10 +381,9 @@ vec4 filter_data(vec4 colour, float low_discard_ratio, float discard_ratio, int 
 
         if (colour.g < low_value)
         {{
-            colour = vec4(0.,0.,0.,0.);
+            colour = vec4(-1.,-1.,-1.,-1.);
         }}
     }}
-    
     return colour;
 }}
 
@@ -494,7 +493,7 @@ void main() {{
                 {{
                     if (colour_cube2.g > 0.)
                     {{                       
-                        color = normalize_ratio(log10(colour_cube1/colour_cube2));
+                        color = normalize_ratio((colour_cube2/colour_cube1));
                     }}
                     else
                     {{
@@ -650,7 +649,7 @@ MIP_SNIPPETS = dict(
                         colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio, 1);
                         colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio_2, discard_ratio_2, 2);
                         
-                        maxval = max(maxval, log(colour_cube1.g/colour_cube2.g)/log(10));
+                        maxval = max(maxval, normalize_ratio((colour_cube2.g/colour_cube1.g)));
                     }}
                 }}
                 else{{
@@ -685,7 +684,7 @@ MIP_SNIPPETS = dict(
                 //gl_FragColor.a = maxval;
             }}
             else {{
-                gl_FragColor = $cmap(normalize_ratio(log10(maxval/maxval2)));
+                gl_FragColor = $cmap(normalize_ratio((maxval2/maxval)));
             }}
         }
         else{
@@ -905,7 +904,7 @@ TRANSLUCENT_SNIPPETS = dict(
                 gl_FragColor = integrated_color;
             }}
             else {{
-                gl_FragColor = integrated_color/integrated_color_2;
+                gl_FragColor = normalize_ratio(integrated_color_2/integrated_color);
             }}
         }
         else {
@@ -1188,6 +1187,9 @@ class RenderVolumeVisual(Visual):
         self.compute_ratio = compute_ratio
         self.show_vol2 = show_vol2
 
+        self.high_discard_filter_ratio_value = 1
+        self.low_discard_filter_ratio_value = 0
+
         self.threshold = threshold if (threshold is not None) else vol.mean()
         # print ("threshold", self.threshold)
         self.freeze()
@@ -1223,31 +1225,27 @@ class RenderVolumeVisual(Visual):
             # Temporarily set clim_2 (2nd volume) to vol1's limits
             self._clim_2 = vol_min, vol_max
 
-        print (self._clim)
+        # print (self._clim)
 
         # Apply clim
         vol = np.flipud(np.array(vol, dtype='float32', copy=False))
-        if self._clim[1] == self._clim[0]:
-            if self._clim[0] != 0.:
-                vol *= 1.0 / self._clim[0]
-        else:
-            vol -= self._clim[0]
-            vol /= self._clim[1] - self._clim[0]
-
-        self.set_ratio_lim()
+        # if self._clim[1] == self._clim[0]:
+        #     if self._clim[0] != 0.:
+        #         vol *= 1.0 / self._clim[0]
+        # else:
+        #     vol -= self._clim[0]
+        #     vol /= self._clim[1] - self._clim[0]
 
         # Deal with nan
         if np.isnan(vol).any():
             vol = np.nan_to_num(vol)
 
-        print('Vol1 min:', vol.min(), 'max:', vol.max())
+        # print('Vol1 min:', vol.min(), 'max:', vol.max())
 
         self.high_discard_filter_value = self._clim[1]
         self.low_discard_filter_value = self._clim[0]
 
-        # Let's just initialize these two with vol1 settings.
-        self.high_discard_filter_ratio_value = self._clim[1]
-        self.low_discard_filter_ratio_value = self._clim[0]
+        self.set_ratio_lim()
 
         # self.volume_mean = np.mean(vol)
         # self.volume_std = np.std(vol)
@@ -1306,13 +1304,13 @@ class RenderVolumeVisual(Visual):
 
         # Apply clim
         vol = np.flipud(np.array(vol, dtype='float32', copy=False))
-        if _clim[1] == _clim[0]:
-            if _clim[0] != 0.:
-                vol *= 1.0 / _clim[0]
-        else:
-            # This should be also applied to the first volume...
-            vol -= min(_clim[0], np.nanmin(vol))
-            vol /= max(_clim[1], np.nanmax(vol)) - min(_clim[0], np.nanmin(vol))
+        # if _clim[1] == _clim[0]:
+        #     if _clim[0] != 0.:
+        #         vol *= 1.0 / _clim[0]
+        # else:
+        #     # This should be also applied to the first volume...
+        #     vol -= min(_clim[0], np.nanmin(vol))
+        #     vol /= max(_clim[1], np.nanmax(vol)) - min(_clim[0], np.nanmin(vol))
             # vol -= np.nanmin(vol)
             # vol /= np.nanmax(vol) - np.nanmin(vol)
 
@@ -1324,7 +1322,6 @@ class RenderVolumeVisual(Visual):
         # Deal with nan
         if np.isnan(vol).any():
             vol = np.nan_to_num(vol)
-            # vol[np.isnan(vol)] = np.nanmin(vol)
 
         # Regrid the cube to match vol1.
         from scipy.ndimage import zoom
@@ -1333,7 +1330,7 @@ class RenderVolumeVisual(Visual):
                       vol1_data_shape[2] / vol.shape[2]]
         vol = zoom(vol, zoom_array)
 
-        print ('Vol2 min:', vol.min(), 'max:', vol.max())
+        # print ('Vol2 min:', vol.min(), 'max:', vol.max())
 
         self.high_discard_filter_value = _clim[1]
         self.low_discard_filter_value = _clim[0]
@@ -1613,8 +1610,8 @@ class RenderVolumeVisual(Visual):
     @high_discard_filter_value.setter
     def high_discard_filter_value(self, high_discard_filter_value):
         self._high_discard_filter_value = float(high_discard_filter_value)
-        self._high_discard_filter_value -= self._clim[0]
-        self._high_discard_filter_value /= self._clim[1] - self._clim[0]
+        # self._high_discard_filter_value -= self._clim[0]
+        # self._high_discard_filter_value /= self._clim[1] - self._clim[0]
 
         self.shared_program['u_high_discard_filter_value'] = self._high_discard_filter_value
         self.set_ratio_lim()
@@ -1628,8 +1625,8 @@ class RenderVolumeVisual(Visual):
     @low_discard_filter_value.setter
     def low_discard_filter_value(self, low_discard_filter_value):
         self._low_discard_filter_value = float(low_discard_filter_value)
-        self._low_discard_filter_value -= self._clim[0]
-        self._low_discard_filter_value /= self._clim[1] - self._clim[0]
+        # self._low_discard_filter_value -= self._clim[0]
+        # self._low_discard_filter_value /= self._clim[1] - self._clim[0]
 
         self.shared_program['u_low_discard_filter_value'] = self._low_discard_filter_value
         self.set_ratio_lim()
@@ -1643,29 +1640,46 @@ class RenderVolumeVisual(Visual):
             vol1_low = self.low_discard_filter_value
             vol1_high = self.high_discard_filter_value
         except:
-            vol1_low = 0
-            vol1_high = 1
+            vol1_low = 1.
+            vol1_high = 1.
 
         try:
             vol2_low = self.low_discard_filter_ratio_value
             vol2_high = self.high_discard_filter_ratio_value
         except:
-            vol2_low = 0
-            vol2_high = 1
+            vol2_low = 1.
+            vol2_high = 1.
 
-        if vol2_low != 0:
-            if vol1_low / vol2_low != 0.:
-                self.shared_program['u_ratio_lim_low'] = np.log10(vol1_low/vol2_low)
-            else:
-                self.shared_program['u_ratio_lim_low'] = 1
+        print (vol2_low, vol2_high, vol1_low, vol1_high)
+
+        if vol1_low != 0.:
+            # high_low = vol2_high / vol1_low
+            low_low = (vol2_low / vol1_low)
+        else:
+            high_low = 0
+            low_low = 0
+
+        if vol1_high != 0.:
+            # low_high = (vol2_low / vol1_high)
+            high_high = (vol2_high / vol1_high)
+        else:
+            low_high = 1.
+            high_high = 1.
+
+        # lower_bound = np.min([high_low, low_low, low_high, high_high])
+        # upper_bound = np.max([high_low, low_low, low_high, high_high])
+        lower_bound = high_high
+        upper_bound = low_low
+
+        if lower_bound != 0:
+            # print ("low limit", vol1_low / vol2_high)
+            self.shared_program['u_ratio_lim_low'] = lower_bound
         else:
             self.shared_program['u_ratio_lim_low'] = 1
 
-        if vol2_high != 0:
-            if vol1_high / vol2_high != 0.:
-                self.shared_program['u_ratio_lim_high'] = np.log10(vol1_high / vol2_high)
-            else:
-                self.shared_program['u_ratio_lim_high'] = 1
+        if upper_bound != 0:
+            # print("high limit", vol1_high / vol2_low)
+            self.shared_program['u_ratio_lim_high'] = upper_bound
         else:
             self.shared_program['u_ratio_lim_high'] = 1
 
@@ -1679,10 +1693,10 @@ class RenderVolumeVisual(Visual):
     def high_discard_filter_ratio_value(self, high_discard_filter_ratio_value):
         self._high_discard_filter_ratio_value = float(high_discard_filter_ratio_value)
 
-        print ("self._clim_2", self._clim_2)
+        # print ("self._clim_2", self._clim_2)
 
-        self._high_discard_filter_ratio_value -= self._clim_2[0]
-        self._high_discard_filter_ratio_value /= self._clim_2[1] - self._clim_2[0]
+        # self._high_discard_filter_ratio_value -= self._clim_2[0]
+        # self._high_discard_filter_ratio_value /= self._clim_2[1] - self._clim_2[0]
 
         self.shared_program['u_high_discard_filter_ratio_value'] = self._high_discard_filter_ratio_value
         self.set_ratio_lim()
@@ -1696,8 +1710,8 @@ class RenderVolumeVisual(Visual):
     @low_discard_filter_ratio_value.setter
     def low_discard_filter_ratio_value(self, low_discard_filter_ratio_value):
         self._low_discard_filter_ratio_value = float(low_discard_filter_ratio_value)
-        self._low_discard_filter_ratio_value -= self._clim_2[0]
-        self._low_discard_filter_ratio_value /= self._clim_2[1] - self._clim_2[0]
+        # self._low_discard_filter_ratio_value -= self._clim_2[0]
+        # self._low_discard_filter_ratio_value /= self._clim_2[1] - self._clim_2[0]
 
         self.shared_program['u_low_discard_filter_ratio_value'] = self._low_discard_filter_ratio_value
         self.set_ratio_lim()

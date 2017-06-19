@@ -139,8 +139,8 @@ class MainWindow(QMainWindow):
 
     def load_volume2(self):
         self.Canvas3D.set_data2(self.props['line_ratio'].loaded_cube2)
-        self.props['line_ratio'].update_discard_filter_ratio_text(self.props['line_ratio'].vol_min,
-                                                                  self.props['line_ratio'].vol_max)
+        self.props['line_ratio'].update_discard_filter_ratio_text(self.props['line_ratio'].vol_min2,
+                                                                  self.props['line_ratio'].vol_max2)
 
     def update_compute_ratio(self):
         self.Canvas3D.set_compute_ratio(self.props['line_ratio'].combo_compute_ratio.currentText())
@@ -207,7 +207,7 @@ class MainWindow(QMainWindow):
 
     def update_high_discard_filter_ratio(self):
         self.Canvas3D.set_high_discard_filter_ratio(self.props['line_ratio'].l_high_discard_filter_ratio_value.text(),
-                                              self.props['line_ratio'].high_scaled_value_ratio)
+                                                    self.props['line_ratio'].high_scaled_value_ratio)
 
     def update_low_discard_filter_ratio(self):
         self.Canvas3D.set_low_discard_filter_ratio(self.props['line_ratio'].l_low_discard_filter_ratio_value.text(),
@@ -359,6 +359,7 @@ class ObjectWidget(QWidget):
             self.slider_high_discard_filter_ratio.setValue(10000)
             self.l_high_discard_filter_ratio_value = QLineEdit(str(self.slider_high_discard_filter_ratio.value()))
             self.slider_high_discard_filter_ratio.valueChanged.connect(self.update_high_discard_filter_ratio)
+            self.l_high_discard_filter_ratio_value.textEdited.connect(self.update_high_discard_filter_ratio_from_textbox)
             array = [l_high_discard_filter_ratio, self.slider_high_discard_filter_ratio, self.l_high_discard_filter_ratio_value]
             serialize_widgets('high_discard_filter_ratio', '', array)
             # for widget in self.widgets_dict['high_discard_filter_ratio']:
@@ -557,6 +558,7 @@ class ObjectWidget(QWidget):
             self.slider_high_discard_filter.setValue(10000)
             self.l_high_discard_filter_value = QLineEdit(str(self.slider_high_discard_filter.value()))
             self.slider_high_discard_filter.valueChanged.connect(self.update_high_discard_filter)
+            self.l_high_discard_filter_value.textEdited.connect(self.update_high_discard_filter_from_textbox)
             array = [l_high_discard_filter, self.slider_high_discard_filter, self.l_high_discard_filter_value]
             serialize_widgets('high_discard_filter', '', array)
             # for widget in self.widgets_dict['high_discard_filter']:
@@ -569,6 +571,7 @@ class ObjectWidget(QWidget):
             self.slider_low_discard_filter.setValue(0)
             self.l_low_discard_filter_value = QLineEdit(str(self.slider_low_discard_filter.value()))
             self.slider_low_discard_filter.valueChanged.connect(self.update_low_discard_filter)
+            self.l_low_discard_filter_value.textEdited.connect(self.update_low_discard_filter_from_textbox)
             array = [l_low_discard_filter, self.slider_low_discard_filter, self.l_low_discard_filter_value]
             serialize_widgets('low_discard_filter', '', array)
 
@@ -797,6 +800,23 @@ class ObjectWidget(QWidget):
             self.l_high_discard_filter_value.setText("{:.4f}".format(self.high_scaled_value))
 
         self.signal_high_discard_filter_changed.emit()
+        
+    def update_low_discard_filter_from_textbox(self):
+
+        # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
+
+        self.low_scaled_value = self.scale_value(float(self.l_low_discard_filter_value.text().replace(',','.')),
+                                                 self.slider_low_discard_filter.minimum(),
+                                                 self.slider_low_discard_filter.maximum(),
+                                                 self.vol_min,
+                                                 self.vol_max)
+
+        # if isinstance(self.l_low_discard_filter_value, int):
+        #     self.l_low_discard_filter_value.setText(str(self.low_scaled_value))
+        # else:
+        #     self.l_low_discard_filter_value.setText("{:.4f}".format(self.low_scaled_value))
+
+        self.signal_low_discard_filter_changed.emit()
 
     def update_low_discard_filter(self):
 
@@ -815,6 +835,23 @@ class ObjectWidget(QWidget):
 
         self.signal_low_discard_filter_changed.emit()
         
+    def update_high_discard_filter_from_textbox(self):
+
+        # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
+
+        self.high_scaled_value = self.scale_value(float(self.l_high_discard_filter_value.text().replace(',','.')),
+                                                 self.slider_high_discard_filter.minimum(),
+                                                 self.slider_high_discard_filter.maximum(),
+                                                 self.vol_min,
+                                                 self.vol_max)
+
+        # if isinstance(self.l_high_discard_filter_value, int):
+        #     self.l_high_discard_filter_value.setText(str(self.high_scaled_value))
+        # else:
+        #     self.l_high_discard_filter_value.setText("{:.4f}".format(self.high_scaled_value))
+
+        self.signal_high_discard_filter_changed.emit()
+        
     def update_high_discard_filter_ratio(self):
 
         # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
@@ -829,6 +866,23 @@ class ObjectWidget(QWidget):
             self.l_high_discard_filter_ratio_value.setText(str(self.high_scaled_value_ratio))
         else:
             self.l_high_discard_filter_ratio_value.setText("{:.4f}".format(self.high_scaled_value_ratio))
+
+        self.signal_high_discard_filter_ratio_changed.emit()
+        
+    def update_high_discard_filter_ratio_from_textbox(self):
+
+        # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
+
+        self.high_scaled_value_ratio = self.scale_value(float(self.l_high_discard_filter_ratio_value.text().replace(',','.')),
+                                                 self.slider_high_discard_filter_ratio.minimum(),
+                                                 self.slider_high_discard_filter_ratio.maximum(),
+                                                 self.vol_min2,
+                                                 self.vol_max2)
+
+        # if isinstance(self.l_high_discard_filter_ratio_value, int):
+        #     self.l_high_discard_filter_ratio_value.setText(str(self.high_scaled_value_ratio))
+        # else:
+        #     self.l_high_discard_filter_ratio_value.setText("{:.4f}".format(self.high_scaled_value_ratio))
 
         self.signal_high_discard_filter_ratio_changed.emit()
 
@@ -853,7 +907,7 @@ class ObjectWidget(QWidget):
 
         # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
 
-        self.low_scaled_value_ratio = self.scale_value(float(self.l_low_discard_filter_ratio_value.text()),
+        self.low_scaled_value_ratio = self.scale_value(float(self.l_low_discard_filter_ratio_value.text().replace(',','.')),
                                                  self.slider_low_discard_filter_ratio.minimum(),
                                                  self.slider_low_discard_filter_ratio.maximum(),
                                                  self.vol_min2,
@@ -1382,7 +1436,7 @@ class Canvas3D(scene.SceneCanvas):
 
         if compute_ratio == 'log(A/B) (1)' or compute_ratio == 'log(A/B) (2)':
             self.cbar.clim = self.ratio_limits #[0.77, 1.53]
-            self.cbar.label_str = 'log(CO/HI)'
+            self.cbar.label_str = 'log(A/B)'
 
         # if compute_ratio == 'log(A/B)':
         #     self.previous_clim = self.cbar.clim
@@ -1409,8 +1463,18 @@ class Canvas3D(scene.SceneCanvas):
         # max_min = min(self.volume.clim[1], self.volume2_clim[1])
         # max_max = max(self.volume.clim[1], self.volume2_clim[1])
 
-        self.ratio_limits = [np.log10(self.volume.clim[0] / self.volume2_clim[0]),
-                             np.log10(self.volume.clim[1] / self.volume2_clim[1])]
+        high_low = self.volume2_clim[1] / self.volume.clim[0]
+        low_low = self.volume2_clim[0] / self.volume.clim[0]
+        low_high = self.volume2_clim[0] / self.volume.clim[1]
+        high_high = self.volume2_clim[1] / self.volume.clim[1]
+
+        # lower_bound = np.min([high_low, low_low, low_high, high_high])
+        # upper_bound = np.max([high_low, low_low, low_high, high_high])
+        lower_bound = high_high
+        upper_bound = low_low
+
+        self.ratio_limits = [lower_bound,
+                             upper_bound]
 
     def set_high_discard_filter_ratio(self, high_discard_filter_ratio_value, scaled_value_ratio):
         self.volume.high_discard_filter_ratio_value = high_discard_filter_ratio_value
@@ -1423,24 +1487,15 @@ class Canvas3D(scene.SceneCanvas):
     def set_data2(self, cube):
         data = self.parse_data_to_3D_only(cube)
 
-        # self.data2_min = data.min()
-        # self.data2_max = data.max()
-
-        # from scipy.ndimage import zoom
-        #
-        # zoom_array = [self.data_shape[0] / data.shape[0],
-        #               self.data_shape[1] / data.shape[1],
-        #               self.data_shape[2] / data.shape[2]]
-        # data = zoom(data, zoom_array)
-
-        print (data.shape)
-
         self.unfreeze()
 
         self.volume2_clim = [np.nanmin(data), np.nanmax(data)]
         self.set_ratio_limits()
 
         self.volume.data2 = [data, self.data_shape]
+        self.volume.low_discard_filter_ratio_value = np.nanmin(data)
+        self.volume.high_discard_filter_ratio_value = np.nanmax(data)
+
         self.freeze()
 
     def set_threshold(self, threshold):
