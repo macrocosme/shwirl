@@ -119,6 +119,12 @@ uniform float u_low_discard_filter_value;
 uniform float u_high_discard_filter_ratio_value;
 uniform float u_low_discard_filter_ratio_value;
 
+uniform float u_lim_low;
+uniform float u_lim_high;
+
+uniform float u_lim_low2;
+uniform float u_lim_high2;
+
 uniform float u_ratio_lim_low;
 uniform float u_ratio_lim_high;
 
@@ -415,6 +421,38 @@ float normalize_ratio(float value) {{
     return value;
 }}
 
+vec4 normalize_cube_value(vec4 value) {{
+    
+    value -= u_lim_low;
+    value /= u_lim_high-u_lim_low;
+    
+    return value;
+}}
+
+float normalize_cube_value(float value) {{
+    
+    value -= u_lim_low;
+    value /= u_lim_high-u_lim_low;
+    
+    return value;
+}}
+
+vec4 normalize_cube2_value(vec4 value) {{
+    
+    value -= u_lim_low2;
+    value /= u_lim_high2-u_lim_low2;
+    
+    return value;
+}}
+
+float normalize_cube2_value(float value) {{
+    
+    value -= u_lim_low2;
+    value /= u_lim_high2-u_lim_low2;
+    
+    return value;
+}}
+
 // for some reason, this has to be the last function in order for the
 // filters to be inserted in the correct place...
 
@@ -483,8 +521,8 @@ void main() {{
             
             if (u_compute_ratio == 0)
             {{
-                color = (1.0-u_show_vol2)*colour_cube1;
-                color += u_show_vol2*colour_cube2;
+                color = (1.0-u_show_vol2)*normalize_cube_value(colour_cube1);
+                color += u_show_vol2*normalize_cube2_value(colour_cube2);
             }}
             else
             {{
@@ -1245,6 +1283,12 @@ class RenderVolumeVisual(Visual):
         self.high_discard_filter_value = self._clim[1]
         self.low_discard_filter_value = self._clim[0]
 
+        self.shared_program['u_lim_high'] = self._clim[1]
+        self.shared_program['u_lim_low'] = self._clim[0]
+        # Initialise vol2 lims with vol1's
+        self.shared_program['u_lim_high2'] = self._clim[1]
+        self.shared_program['u_lim_low2'] = self._clim[0]
+
         self.set_ratio_lim()
 
         # self.volume_mean = np.mean(vol)
@@ -1334,6 +1378,9 @@ class RenderVolumeVisual(Visual):
 
         self.high_discard_filter_value = _clim[1]
         self.low_discard_filter_value = _clim[0]
+
+        self.shared_program['u_lim_high2'] = _clim[1]
+        self.shared_program['u_lim_low2'] = _clim[0]
 
         # self.volume_mean = np.mean(vol)
         # self.volume_std = np.std(vol)
