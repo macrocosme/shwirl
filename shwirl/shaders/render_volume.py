@@ -101,6 +101,7 @@ uniform int u_filter_size;
 uniform float u_filter_coeff;
 uniform int u_filter_arm;
 uniform int u_filter_type;
+uniform int u_filter_type_ratio;
 
 uniform int u_use_gaussian_filter;
 uniform int u_gaussian_filter_size;
@@ -380,14 +381,42 @@ vec4 filter_data(vec4 colour, float low_discard_ratio, float discard_ratio, int 
     }}
     // Filter out mode only supported for volume 2 for now.
     else {{
-        if (colour.g > high_value)
-        {{
-            colour = vec4(0.,0.,0.,0.);
+        if (u_filter_type_ratio == 1) {{
+            // Get rid of very strong signal values
+            if (colour.g > high_value)
+            {{
+                colour = vec4(0.,0.,0.,0.);
+            }}
+    
+            // Don't consider noisy values
+            //if (val < u_volume_mean - 3*u_volume_std)
+            if (colour.g < low_value)
+            {{
+                colour = vec4(0.,0.,0.,0.);
+            }}
+    
+            if (low_value == high_value)
+            {{
+                if (low_value != 0.)
+                {{
+                    colour *= low_discard_ratio;
+                }}
+            }}
+            else {{
+                colour -= low_value;
+                colour *= discard_ratio;
+            }}
         }}
-
-        if (colour.g < low_value)
-        {{
-            colour = vec4(-1.,-1.,-1.,-1.);
+        else {{
+            if (colour.g > high_value)
+            {{
+                colour = vec4(0.,0.,0.,0.);
+            }}
+    
+            if (colour.g < low_value)
+            {{
+                colour = vec4(0.,0.,0.,0.);
+            }}
         }}
     }}
     return colour;
@@ -422,33 +451,85 @@ float normalize_ratio(float value) {{
 }}
 
 vec4 normalize_cube_value(vec4 value) {{
+
+    float low;
+    float high;
     
-    value -= u_lim_low;
-    value /= u_lim_high-u_lim_low;
+    if (u_lim_low > u_lim_low2)
+        low = u_lim_low;
+    else
+        low = u_lim_low2;
+    
+    if (u_lim_high > u_lim_high2)
+        high = u_lim_high;
+    else
+        high = u_lim_high2;
+    
+    value -= low;
+    value /= high-low;
     
     return value;
 }}
 
 float normalize_cube_value(float value) {{
     
-    value -= u_lim_low;
-    value /= u_lim_high-u_lim_low;
+    float low;
+    float high;
+    
+    if (u_lim_low > u_lim_low2)
+        low = u_lim_low;
+    else
+        low = u_lim_low2;
+    
+    if (u_lim_high > u_lim_high2)
+        high = u_lim_high;
+    else
+        high = u_lim_high2;
+    
+    value -= low;
+    value /= high-low;
     
     return value;
 }}
 
 vec4 normalize_cube2_value(vec4 value) {{
     
-    value -= u_lim_low2;
-    value /= u_lim_high2-u_lim_low2;
+    float low;
+    float high;
+    
+    if (u_lim_low > u_lim_low2)
+        low = u_lim_low;
+    else
+        low = u_lim_low2;
+    
+    if (u_lim_high > u_lim_high2)
+        high = u_lim_high;
+    else
+        high = u_lim_high2;
+    
+    value -= low;
+    value /= high-low;
     
     return value;
 }}
 
 float normalize_cube2_value(float value) {{
     
-    value -= u_lim_low2;
-    value /= u_lim_high2-u_lim_low2;
+    float low;
+    float high;
+    
+    if (u_lim_low > u_lim_low2)
+        low = u_lim_low;
+    else
+        low = u_lim_low2;
+    
+    if (u_lim_high > u_lim_high2)
+        high = u_lim_high;
+    else
+        high = u_lim_high2;
+    
+    value -= low;
+    value /= high-low;
     
     return value;
 }}
@@ -561,18 +642,41 @@ void main() {{
         if (u_use_gaussian_filter==1) {{
             vec4 temp_color;
             vec3 direction;
+            
             if (u_gaussian_filter_size == 5){{
-                // horizontal
-                direction = vec3(1., 0., 0.);
-                temp_color = Gaussian_5(color, loc, direction);
-
-                // vertical
-                direction = vec3(0., 1., 0.);
-                temp_color = Gaussian_5(temp_color, loc, direction);
-
-                // depth
-                direction = vec3(0., 0., 1.);
-                temp_color = Gaussian_5(temp_color, loc, direction);
+                if (u_compute_ratio == 0)
+                {{
+                    // horizontal
+                    direction = vec3(1., 0., 0.);
+                    temp_color = Gaussian_5(color, loc, direction);
+    
+                    // vertical
+                    direction = vec3(0., 1., 0.);
+                    temp_color = Gaussian_5(temp_color, loc, direction);
+    
+                    // depth
+                    direction = vec3(0., 0., 1.);
+                    temp_color = Gaussian_5(temp_color, loc, direction);
+                }}
+                else {{
+                    if (u_compute_ratio == 1) {{
+                        // horizontal
+                        direction = vec3(1., 0., 0.);
+                        temp_color = Gaussian_5(color, loc, direction);
+        
+                        // vertical
+                        direction = vec3(0., 1., 0.);
+                        temp_color = Gaussian_5(temp_color, loc, direction);
+        
+                        // depth
+                        direction = vec3(0., 0., 1.);
+                        temp_color = Gaussian_5(temp_color, loc, direction);
+                    
+                    }}
+                    else {{
+                    
+                    }}
+                }}
             }}
 
             if (u_gaussian_filter_size == 9){{
@@ -938,7 +1042,7 @@ TRANSLUCENT_SNIPPETS = dict(
     after_loop="""
 
         if (u_color_method != 3){
-            if (u_compute_ratio != 2) {{
+            if (u_compute_ratio == 2) {{
                 gl_FragColor = integrated_color;
             }}
             else {{
@@ -1119,7 +1223,7 @@ class RenderVolumeVisual(Visual):
                  filter_type = 0, filter_size = 1,
                  use_gaussian_filter = False, gaussian_filter_size=9,
                  density_factor=0.01, color_method='Moment 0', log_scale=0,
-                 interpolation='linear', compute_ratio=False, show_vol2=0.):
+                 interpolation='linear', compute_ratio=False, show_vol2=0., filter_type_ratio=0):
 
         tex_cls = TextureEmulated3D if emulate_texture else Texture3D
 
@@ -1224,6 +1328,7 @@ class RenderVolumeVisual(Visual):
         self.color_method = color_method
         self.compute_ratio = compute_ratio
         self.show_vol2 = show_vol2
+        self.filter_type_ratio = filter_type_ratio
 
         self.high_discard_filter_ratio_value = 1
         self.low_discard_filter_ratio_value = 0
@@ -1630,6 +1735,20 @@ class RenderVolumeVisual(Visual):
         self.update()
 
     @property
+    def filter_type_ratio(self):
+        return self._filter_type_ratio
+
+    @filter_type_ratio.setter
+    def filter_type_ratio(self, filter_type_ratio):
+        if filter_type_ratio == 'Rescale':
+            self._filter_type_ratio = 1
+        else:
+            self._filter_type_ratio = 0
+
+        self.shared_program['u_filter_type_ratio'] = int(self._filter_type_ratio)
+        self.update()
+
+    @property
     def use_gaussian_filter(self):
         return self._use_gaussian_filter
 
@@ -1697,7 +1816,7 @@ class RenderVolumeVisual(Visual):
             vol2_low = 1.
             vol2_high = 1.
 
-        print (vol2_low, vol2_high, vol1_low, vol1_high)
+        # print (vol2_low, vol2_high, vol1_low, vol1_high)
 
         if vol1_low != 0.:
             # high_low = vol2_high / vol1_low
@@ -1784,16 +1903,18 @@ class RenderVolumeVisual(Visual):
     @compute_ratio.setter
     def compute_ratio(self, compute_ratio=False):
 
-        if compute_ratio == 'log(A/B) (1)':
-            self._compute_ratio = 1
-        elif compute_ratio == 'log(A/B) (2)':
-            self._compute_ratio = 2
-        elif compute_ratio == 'abs(A-B)':
-            self._compute_ratio = 3
-        else:
-            self._compute_ratio = 0
+        self._compute_ratio = compute_ratio
 
-        self.shared_program['u_compute_ratio'] = int(self._compute_ratio)
+        if compute_ratio == 'log(A/B) (1)':
+            self._compute_ratio_index = 1
+        elif compute_ratio == 'log(A/B) (2)':
+            self._compute_ratio_index = 2
+        elif compute_ratio == 'abs(A-B)':
+            self._compute_ratio_index = 3
+        else:
+            self._compute_ratio_index = 0
+
+        self.shared_program['u_compute_ratio'] = int(self._compute_ratio_index)
 
         self.update()
 

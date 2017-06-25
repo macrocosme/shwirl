@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
         self.props['line_ratio'].signal_file2_loaded.connect(self.load_volume2)
         self.props['line_ratio'].signal_compute_ratio_changed.connect(self.update_compute_ratio)
         self.props['line_ratio'].signal_show_vol2_changed.connect(self.update_show_vol2)
+        self.props['line_ratio'].signal_filter_type_ratio_changed.connect(self.signal_filter_type_ratio)
         self.props['line_ratio'].signal_high_discard_filter_ratio_changed.connect(self.update_high_discard_filter_ratio)
         self.props['line_ratio'].signal_low_discard_filter_ratio_changed.connect(self.update_low_discard_filter_ratio)
 
@@ -194,6 +195,9 @@ class MainWindow(QMainWindow):
 
     def signal_filter_type(self):
         self.Canvas3D.set_filter_type(self.props['filtering'].combo_filter_type.currentText())
+        
+    def signal_filter_type_ratio(self):
+        self.Canvas3D.set_filter_type_ratio(self.props['line_ratio'].combo_filter_type_ratio.currentText())
 
     def update_high_discard_filter(self):
         self.Canvas3D.set_high_discard_filter(self.props['filtering'].l_high_discard_filter_value.text(),
@@ -285,6 +289,7 @@ class ObjectWidget(QWidget):
     signal_color_scale_changed = pyqtSignal(name='color_scaleChanged')
     signal_filter_size_changed = pyqtSignal(name='filter_sizeChanged')
     signal_filter_type_changed = pyqtSignal(name='filter_typeChanged')
+    signal_filter_type_ratio_changed = pyqtSignal(name='filter_type_ratioChanged')
     signal_high_discard_filter_changed = pyqtSignal(name='high_discard_filterChanged')
     signal_low_discard_filter_changed = pyqtSignal(name='low_discard_filterChanged')
     signal_high_discard_filter_ratio_changed = pyqtSignal(name='high_discard_filter_ratioChanged')
@@ -351,6 +356,14 @@ class ObjectWidget(QWidget):
             self.slider_show_vol2.valueChanged.connect(self.update_show_vol2)
             array = [l_show_vol2, self.slider_show_vol2, self.l_show_vol2_value]
             serialize_widgets('show_vol2', '', array)
+
+            l_filter_type_ratio = QLabel("Filter type")
+            self.filter_type_ratio = ['Filter out', 'Rescale']
+            self.combo_filter_type_ratio = QComboBox(self)
+            self.combo_filter_type_ratio.addItems(self.filter_type_ratio)
+            self.combo_filter_type_ratio.currentIndexChanged.connect(self.update_filter_type_ratio)
+            array = [l_filter_type_ratio, self.combo_filter_type_ratio]
+            serialize_widgets('filter_type_ratio', '', array)
 
             l_high_discard_filter_ratio = QLabel("high filter ")
             self.slider_high_discard_filter_ratio = QSlider(Qt.Horizontal, self)
@@ -770,16 +783,10 @@ class ObjectWidget(QWidget):
         self.signal_filter_size_changed.emit()
 
     def update_filter_type(self):
-        # if self.combo_filter_type.currentText() == 'Rescale':
-        #     for widget in self.widgets_dict['high_discard_filter']:
-        #         widget.show()
-        # else:
-        #     for widget in self.widgets_dict['high_discard_filter']:
-        #         widget.hide()
-        #
-        #     self.reset_discard_filters_values()
-
         self.signal_filter_type_changed.emit()
+
+    def update_filter_type_ratio(self):
+        self.signal_filter_type_ratio_changed.emit()
 
     def update_gaussian_filter_size(self):
         self.signal_filter_size_changed.emit()
@@ -1436,7 +1443,7 @@ class Canvas3D(scene.SceneCanvas):
 
         if compute_ratio == 'log(A/B) (1)' or compute_ratio == 'log(A/B) (2)':
             self.cbar.clim = self.ratio_limits #[0.77, 1.53]
-            self.cbar.label_str = 'log(A/B)'
+            self.cbar.label_str = '[NII]/Ha'
 
         # if compute_ratio == 'log(A/B)':
         #     self.previous_clim = self.cbar.clim
@@ -1463,25 +1470,35 @@ class Canvas3D(scene.SceneCanvas):
         # max_min = min(self.volume.clim[1], self.volume2_clim[1])
         # max_max = max(self.volume.clim[1], self.volume2_clim[1])
 
-        high_low = self.volume2_clim[1] / self.volume.clim[0]
-        low_low = self.volume2_clim[0] / self.volume.clim[0]
-        low_high = self.volume2_clim[0] / self.volume.clim[1]
-        high_high = self.volume2_clim[1] / self.volume.clim[1]
+        # high_low = self.volume2_clim[1] / self.volume.clim[0]
 
-        # lower_bound = np.min([high_low, low_low, low_high, high_high])
-        # upper_bound = np.max([high_low, low_low, low_high, high_high])
+        # print ("self.volume2_clim", self.volume2_clim)
+
+        low_low = self.volume.low_discard_filter_ratio_value / self.volume.low_discard_filter_value
+        # low_high = self.volume2_clim[0] / self.volume.clim[1]
+        high_high = self.volume.high_discard_filter_ratio_value / self.volume.high_discard_filter_value
+
         lower_bound = high_high
         upper_bound = low_low
+
+        print("low", self.volume.low_discard_filter_ratio_value, self.volume.low_discard_filter_value)
+        print("high", self.volume.high_discard_filter_ratio_value, self.volume.high_discard_filter_value)
+        print("bounds", lower_bound, upper_bound)
 
         self.ratio_limits = [lower_bound,
                              upper_bound]
 
     def set_high_discard_filter_ratio(self, high_discard_filter_ratio_value, scaled_value_ratio):
         self.volume.high_discard_filter_ratio_value = high_discard_filter_ratio_value
+        self.set_ratio_limits()
+        # self.set_compute_ratio(self.volume.compute_ratio)
+
         # self.update_clim("high", scaled_value_ratio, filter_type)
 
     def set_low_discard_filter_ratio(self, low_discard_filter_ratio_value, scaled_value_ratio):
         self.volume.low_discard_filter_ratio_value = low_discard_filter_ratio_value
+        self.set_ratio_limits()
+        # self.set_compute_ratio(self.volume.compute_ratio)
         # self.update_clim("low", scaled_value_ratio, filter_type)
 
     def set_data2(self, cube):
@@ -1489,12 +1506,10 @@ class Canvas3D(scene.SceneCanvas):
 
         self.unfreeze()
 
-        self.volume2_clim = [np.nanmin(data), np.nanmax(data)]
-        self.set_ratio_limits()
-
         self.volume.data2 = [data, self.data_shape]
         self.volume.low_discard_filter_ratio_value = np.nanmin(data)
         self.volume.high_discard_filter_ratio_value = np.nanmax(data)
+        self.set_ratio_limits()
 
         self.freeze()
 
@@ -1522,6 +1537,9 @@ class Canvas3D(scene.SceneCanvas):
 
     def set_filter_type(self, filter_type):
         self.volume.filter_type = filter_type
+        
+    def set_filter_type_ratio(self, filter_type_ratio):
+        self.volume.filter_type_ratio = filter_type_ratio
 
     def set_gaussian_filter(self, use_gaussian_filter, gaussian_filter_size):
         self.volume.use_gaussian_filter = use_gaussian_filter
