@@ -122,7 +122,6 @@ class MainWindow(QMainWindow):
 
     def keyPressEvent(self, e):
         if e.key() == QtCore.Qt.Key_Escape:
-            print ("blabla")
             self.app.quit()
 
     def load_volume(self):
@@ -332,8 +331,8 @@ class ObjectWidget(QWidget):
             l_compute_ratio = QLabel("Analysis")
             # self.l_compute_ratio = ['mip', 'translucent', 'translucent2', 'iso', 'additive']
             self.compute_ratio = ['',
-                                  'log(A/B) (1)',
-                                  'log(A/B) (2)',
+                                  'Ratio (global)',
+                                  'Ratio (/voxel)',
                                   'abs(A-B)']
             self.combo_compute_ratio = QComboBox(self)
             self.combo_compute_ratio.addItems(self.compute_ratio)
@@ -1410,7 +1409,10 @@ class Canvas3D(scene.SceneCanvas):
     def set_cbar_label_str(self, cmap=None):
         # print(self.volume.color_method)
         if (self.volume.color_method == 0):
-            label = str(self.bunit)
+            if str(self.bunit) != 'Flux':
+                label = 'FLUX (' + str(self.bunit) + ')'
+            else:
+                label = 'FLUX'
             # print("label", label)
             clim = self.volume.clim
         else:
@@ -1441,9 +1443,10 @@ class Canvas3D(scene.SceneCanvas):
         else:
             self.set_cbar_label_str()
 
-        if compute_ratio == 'log(A/B) (1)' or compute_ratio == 'log(A/B) (2)':
-            self.cbar.clim = self.ratio_limits #[0.77, 1.53]
+        if compute_ratio == 'Ratio (global)' or compute_ratio == 'Ratio (/voxel)':
+            # self.cbar.clim = self.ratio_limits #[0.77, 1.53]
             self.cbar.label_str = '[NII]/Ha'
+            self.set_ratio_limits()
 
         # if compute_ratio == 'log(A/B)':
         #     self.previous_clim = self.cbar.clim
@@ -1474,19 +1477,32 @@ class Canvas3D(scene.SceneCanvas):
 
         # print ("self.volume2_clim", self.volume2_clim)
 
-        low_low = self.volume.low_discard_filter_ratio_value / self.volume.low_discard_filter_value
-        # low_high = self.volume2_clim[0] / self.volume.clim[1]
-        high_high = self.volume.high_discard_filter_ratio_value / self.volume.high_discard_filter_value
+        # low_low = self.volume.low_discard_filter_ratio_value / self.volume.low_discard_filter_value
+        # low_high = self.volume.low_discard_filter_ratio_value / self.volume.high_discard_filter_value
+        #
+        # high_low = self.volume.high_discard_filter_ratio_value / self.volume.low_discard_filter_value
+        # high_high = self.volume.high_discard_filter_ratio_value / self.volume.high_discard_filter_value
+        #
+        # lower_bound = np.nanmin([high_low, low_low, low_high, high_high])
+        # upper_bound = np.nanmax([high_low, low_low, low_high, high_high])
+        # # lower_bound = high_high
+        # # upper_bound = low_low
+        #
+        # print()
+        # print("low", self.volume.low_discard_filter_ratio_value, self.volume.low_discard_filter_value)
+        # print("high", self.volume.high_discard_filter_ratio_value, self.volume.high_discard_filter_value)
+        # print("bounds", lower_bound, upper_bound)
 
-        lower_bound = high_high
-        upper_bound = low_low
 
-        print("low", self.volume.low_discard_filter_ratio_value, self.volume.low_discard_filter_value)
-        print("high", self.volume.high_discard_filter_ratio_value, self.volume.high_discard_filter_value)
-        print("bounds", lower_bound, upper_bound)
+        lower_bound = self.volume.ratio_lim_low
+        upper_bound = self.volume.ratio_lim_high
 
         self.ratio_limits = [lower_bound,
                              upper_bound]
+
+        if self.volume.compute_ratio in ['Ratio (global)', 'Ratio (/voxel)']:
+            self.cbar.clim = self.ratio_limits
+
 
     def set_high_discard_filter_ratio(self, high_discard_filter_ratio_value, scaled_value_ratio):
         self.volume.high_discard_filter_ratio_value = high_discard_filter_ratio_value

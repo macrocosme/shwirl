@@ -455,15 +455,8 @@ vec4 normalize_cube_value(vec4 value) {{
     float low;
     float high;
     
-    if (u_lim_low > u_lim_low2)
-        low = u_lim_low;
-    else
-        low = u_lim_low2;
-    
-    if (u_lim_high > u_lim_high2)
-        high = u_lim_high;
-    else
-        high = u_lim_high2;
+    low = u_lim_low;
+    high = u_lim_high;
     
     value -= low;
     value /= high-low;
@@ -476,10 +469,8 @@ float normalize_cube_value(float value) {{
     float low;
     float high;
     
-    if (u_lim_low > u_lim_low2)
-        low = u_lim_low;
-    else
-        low = u_lim_low2;
+    low = u_lim_low;
+    high = u_lim_high;
     
     if (u_lim_high > u_lim_high2)
         high = u_lim_high;
@@ -497,15 +488,8 @@ vec4 normalize_cube2_value(vec4 value) {{
     float low;
     float high;
     
-    if (u_lim_low > u_lim_low2)
-        low = u_lim_low;
-    else
-        low = u_lim_low2;
-    
-    if (u_lim_high > u_lim_high2)
-        high = u_lim_high;
-    else
-        high = u_lim_high2;
+    low = u_lim_low2;
+    high = u_lim_high2;
     
     value -= low;
     value /= high-low;
@@ -518,15 +502,8 @@ float normalize_cube2_value(float value) {{
     float low;
     float high;
     
-    if (u_lim_low > u_lim_low2)
-        low = u_lim_low;
-    else
-        low = u_lim_low2;
-    
-    if (u_lim_high > u_lim_high2)
-        high = u_lim_high;
-    else
-        high = u_lim_high2;
+    low = u_lim_low2;
+    high = u_lim_high2;
     
     value -= low;
     value /= high-low;
@@ -610,7 +587,7 @@ void main() {{
                 // Technique 1: Compute the ratio on a voxel by voxel basis
                 if (u_compute_ratio == 1)
                 {{
-                    if (colour_cube2.g > 0.)
+                    if (colour_cube1.g != 0.)
                     {{                       
                         color = normalize_ratio((colour_cube2/colour_cube1));
                     }}
@@ -786,7 +763,7 @@ MIP_SNIPPETS = dict(
             {{
                 if (u_compute_ratio == 1)
                 {{
-                    if (colour_cube2.g > 0.)
+                    if (colour_cube1.g != 0.)
                     {{                        
                         colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio, 1);
                         colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio_2, discard_ratio_2, 2);
@@ -797,14 +774,12 @@ MIP_SNIPPETS = dict(
                 else{{
                     if (u_compute_ratio == 2)
                     {{
-                        if (colour_cube1.g > 0. && colour_cube2.g > 0.)
-                        {{
-                            colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio, 1);
-                            colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio_2, discard_ratio_2, 2);
-                            
-                            maxval = max(maxval, colour_cube1.g);
-                            maxval2 = max(maxval2, colour_cube2.g);
-                        }}
+
+                        colour_cube1 = filter_data($sample(u_volumetex, loc), low_discard_ratio, discard_ratio, 1);
+                        colour_cube2 = filter_data($sample2(u_volumetex2, loc), low_discard_ratio_2, discard_ratio_2, 2);
+                        
+                        maxval = max(maxval, colour_cube1.g);
+                        maxval2 = max(maxval2, colour_cube2.g);
                     }}
                     else 
                     {{
@@ -826,7 +801,12 @@ MIP_SNIPPETS = dict(
                 //gl_FragColor.a = maxval;
             }}
             else {{
-                gl_FragColor = $cmap(normalize_ratio((maxval2/maxval)));
+                if (maxval != 0.){{
+                    gl_FragColor = $cmap(normalize_ratio((maxval2/maxval)));
+                }}
+                else {{
+                    gl_FragColor = $cmap(0.);
+                }}
             }}
         }
         else{
@@ -1046,7 +1026,12 @@ TRANSLUCENT_SNIPPETS = dict(
                 gl_FragColor = integrated_color;
             }}
             else {{
-                gl_FragColor = normalize_ratio(integrated_color_2/integrated_color);
+                if (integrated_color != 0) {{
+                    gl_FragColor = normalize_ratio(integrated_color_2/integrated_color);
+                }}
+                {{
+                    gl_FragColor = $cmap(0.);
+                }}
             }}
         }
         else {
@@ -1223,7 +1208,7 @@ class RenderVolumeVisual(Visual):
                  filter_type = 0, filter_size = 1,
                  use_gaussian_filter = False, gaussian_filter_size=9,
                  density_factor=0.01, color_method='Moment 0', log_scale=0,
-                 interpolation='linear', compute_ratio=False, show_vol2=0., filter_type_ratio=0):
+                 interpolation='linear', compute_ratio='', show_vol2=0., filter_type_ratio=0):
 
         tex_cls = TextureEmulated3D if emulate_texture else Texture3D
 
@@ -1307,6 +1292,8 @@ class RenderVolumeVisual(Visual):
         # box and will not be drawn.
         self.set_gl_state('translucent', cull_face=False)
 
+        self.vol2 = None
+
         # Set data
         self.set_data(vol, clim)
 
@@ -1331,7 +1318,10 @@ class RenderVolumeVisual(Visual):
         self.filter_type_ratio = filter_type_ratio
 
         self.high_discard_filter_ratio_value = 1
-        self.low_discard_filter_ratio_value = 0
+        self.low_discard_filter_ratio_value = 1
+
+        self.ratio_lim_low = 1
+        self.ratio_lim_high = 1
 
         self.threshold = threshold if (threshold is not None) else vol.mean()
         # print ("threshold", self.threshold)
@@ -1394,7 +1384,11 @@ class RenderVolumeVisual(Visual):
         self.shared_program['u_lim_high2'] = self._clim[1]
         self.shared_program['u_lim_low2'] = self._clim[0]
 
-        self.set_ratio_lim()
+        self.vol1 = vol
+
+        # We simply keep the volume in memory to compute ratio limits...
+        # Eventually, this should be all done on the GPU to free memory.
+
 
         # self.volume_mean = np.mean(vol)
         # self.volume_std = np.std(vol)
@@ -1418,11 +1412,28 @@ class RenderVolumeVisual(Visual):
         self._kb_for_texture = np.prod(self._vol_shape) / 1024
 
     @property
+    def vol1(self):
+        return self._vol1
+
+    @vol1.setter
+    def vol1(self, vol1):
+        self._vol1 = vol1
+    
+    @property
+    def vol2(self):
+        return self._vol2
+
+    @vol2.setter
+    def vol2(self, vol2):
+        self._vol2 = vol2
+
+    @property
     def data2(self):
         return self._tex2
 
     @data2.setter
     def data2(self, vol, clim=None):
+        self.vol2 = vol[0]
         self.set_data2(vol[0], vol1_data_shape=vol[1], clim=None)
 
     def set_data2(self, vol, vol1_data_shape=None, clim=None):
@@ -1466,8 +1477,6 @@ class RenderVolumeVisual(Visual):
         self._clim_2 = min(_clim[0], np.nanmin(vol)), max(_clim[1], np.nanmax(vol))
         # self._clim_2 = np.nanmin(vol), np.nanmax(vol)
 
-        self.set_ratio_lim()
-
         # Deal with nan
         if np.isnan(vol).any():
             vol = np.nan_to_num(vol)
@@ -1481,11 +1490,14 @@ class RenderVolumeVisual(Visual):
 
         # print ('Vol2 min:', vol.min(), 'max:', vol.max())
 
-        self.high_discard_filter_value = _clim[1]
-        self.low_discard_filter_value = _clim[0]
+        self.high_discard_filter_ratio_value = _clim[1]
+        self.low_discard_filter_ratio_value = _clim[0]
 
         self.shared_program['u_lim_high2'] = _clim[1]
         self.shared_program['u_lim_low2'] = _clim[0]
+
+        self.vol2 = vol
+        self.set_ratio_lim()
 
         # self.volume_mean = np.mean(vol)
         # self.volume_std = np.std(vol)
@@ -1780,7 +1792,12 @@ class RenderVolumeVisual(Visual):
         # self._high_discard_filter_value /= self._clim[1] - self._clim[0]
 
         self.shared_program['u_high_discard_filter_value'] = self._high_discard_filter_value
-        self.set_ratio_lim()
+
+        try:
+            _ = self.vol2.shape
+            self.set_ratio_lim()
+        except:
+            pass
 
         self.update()
 
@@ -1795,60 +1812,136 @@ class RenderVolumeVisual(Visual):
         # self._low_discard_filter_value /= self._clim[1] - self._clim[0]
 
         self.shared_program['u_low_discard_filter_value'] = self._low_discard_filter_value
-        self.set_ratio_lim()
+        try:
+            _ = self.vol2.shape
+            self.set_ratio_lim()
+        except:
+            pass
 
         self.update()
 
+
+    # def set_ratio_lim(self):
+    #
+    #     # Normalized limits
+    #     try:
+    #         vol1_low = self.low_discard_filter_value
+    #         vol1_high = self.high_discard_filter_value
+    #     except:
+    #         vol1_low = 1.
+    #         vol1_high = 1.
+    #
+    #     try:
+    #         vol2_low = self.low_discard_filter_ratio_value
+    #         vol2_high = self.high_discard_filter_ratio_value
+    #     except:
+    #         vol2_low = 1.
+    #         vol2_high = 1.
+    #
+    #     # print (vol2_low, vol2_high, vol1_low, vol1_high)
+    #
+    #     if vol1_low != 0.:
+    #         high_low = (vol2_high / vol1_low)
+    #         low_low = (vol2_low / vol1_low)
+    #     else:
+    #         high_low = 0
+    #         low_low = 0
+    #
+    #     if vol1_high != 0.:
+    #         low_high = (vol2_low / vol1_high)
+    #         high_high = (vol2_high / vol1_high)
+    #     else:
+    #         low_high = 1.
+    #         high_high = 1.
+    #
+    #     lower_bound = np.min([high_low, low_low, low_high, high_high])
+    #     upper_bound = np.max([high_low, low_low, low_high, high_high])
+    #     # lower_bound = high_high
+    #     # upper_bound = low_low
+    #
+    #     if lower_bound != 0:
+    #         # print ("low limit", vol1_low / vol2_high)
+    #         self.shared_program['u_ratio_lim_low'] = lower_bound
+    #     else:
+    #         self.shared_program['u_ratio_lim_low'] = 1
+    #
+    #     if upper_bound != 0:
+    #         # print("high limit", vol1_high / vol2_low)
+    #         self.shared_program['u_ratio_lim_high'] = upper_bound
+    #     else:
+    #         self.shared_program['u_ratio_lim_high'] = 1
+    #
+    #     self.update()
+
     def set_ratio_lim(self):
+        # Eventually, this should be computed straight on the GPU...
+        # it's the whole point of computing all of this in parallel on the GPU!
 
-        # Normalized limits
-        try:
-            vol1_low = self.low_discard_filter_value
-            vol1_high = self.high_discard_filter_value
-        except:
-            vol1_low = 1.
-            vol1_high = 1.
+        ratio_image = np.zeros((self.vol1.shape[0],self.vol1.shape[2]))
+        ratio_image[np.where(ratio_image == 0)] = np.nan
 
-        try:
-            vol2_low = self.low_discard_filter_ratio_value
-            vol2_high = self.high_discard_filter_ratio_value
-        except:
-            vol2_low = 1.
-            vol2_high = 1.
+        vol1 = self.vol1.copy()
+        vol2 = self.vol2.copy()
 
-        # print (vol2_low, vol2_high, vol1_low, vol1_high)
+        vol1[np.where(vol1 <= self.low_discard_filter_value)] = 0
+        vol1[np.where(vol1 >= self.high_discard_filter_value)] = 0
 
-        if vol1_low != 0.:
-            # high_low = vol2_high / vol1_low
-            low_low = (vol2_low / vol1_low)
+        vol2[np.where(vol2 <= self.low_discard_filter_ratio_value)] = 0
+        vol2[np.where(vol2 >= self.high_discard_filter_ratio_value)] = 0
+
+        # Currently, only two cases (expecting the use of MIP)
+        if self.compute_ratio == 'Ratio (/voxel)':
+            for i in range(vol1.shape[0]):
+                for j in range(vol1.shape[2]):
+                    for k in range(vol1.shape[1]):
+                        if vol1[j, k, i] != 0:
+                            ratio = vol2[j, k, i] / vol1[j, k, i]
+                            if np.isnan(ratio_image[i, j]):
+                                ratio_image[i, j] = ratio
+                            elif ratio_image[i, j] < ratio:
+                                ratio_image[i, j] = ratio
         else:
-            high_low = 0
-            low_low = 0
+            for i in range(vol1.shape[0]):
+                for j in range(vol1.shape[2]):
 
-        if vol1_high != 0.:
-            # low_high = (vol2_low / vol1_high)
-            high_high = (vol2_high / vol1_high)
-        else:
-            low_high = 1.
-            high_high = 1.
+                    spectrum_one = vol1[i, :, j]
+                    spectrum_two = vol2[i, :, j]
+                    try:
+                        if np.nanmax(spectrum_one) != 0:
+                            ratio_image[i, j] = spectrum_two.max() / spectrum_one.max()
+                        else:
+                            ratio_image[i, j] = np.nan
+                    except:
+                        ratio_image[i, j] = np.nan
 
-        # lower_bound = np.min([high_low, low_low, low_high, high_high])
-        # upper_bound = np.max([high_low, low_low, low_high, high_high])
-        lower_bound = high_high
-        upper_bound = low_low
+        self.ratio_lim_low = np.nanmin(ratio_image)
+        self.ratio_lim_high = np.nanmax(ratio_image)
 
-        if lower_bound != 0:
-            # print ("low limit", vol1_low / vol2_high)
-            self.shared_program['u_ratio_lim_low'] = lower_bound
-        else:
-            self.shared_program['u_ratio_lim_low'] = 1
+        print(self.compute_ratio, self.ratio_lim_low, self.ratio_lim_high)
+        print("vol1", self.low_discard_filter_value, self.high_discard_filter_value)
+        print("vol2", self.low_discard_filter_ratio_value, self.low_discard_filter_ratio_value)
+        print("shapes", self.vol1.shape, self.vol2.shape)
+        print ()
 
-        if upper_bound != 0:
-            # print("high limit", vol1_high / vol2_low)
-            self.shared_program['u_ratio_lim_high'] = upper_bound
-        else:
-            self.shared_program['u_ratio_lim_high'] = 1
 
+    @property
+    def ratio_lim_high(self):
+        return self._ratio_lim_high
+
+    @ratio_lim_high.setter
+    def ratio_lim_high(self, ratio_lim_high):
+        self._ratio_lim_high = ratio_lim_high
+        self.shared_program['u_ratio_lim_high'] = ratio_lim_high
+        self.update()
+    
+    @property
+    def ratio_lim_low(self):
+        return self._ratio_lim_low
+
+    @ratio_lim_low.setter
+    def ratio_lim_low(self, ratio_lim_low):
+        self._ratio_lim_low = ratio_lim_low
+        self.shared_program['u_ratio_lim_low'] = ratio_lim_low
         self.update()
 
     @property
@@ -1865,7 +1958,11 @@ class RenderVolumeVisual(Visual):
         # self._high_discard_filter_ratio_value /= self._clim_2[1] - self._clim_2[0]
 
         self.shared_program['u_high_discard_filter_ratio_value'] = self._high_discard_filter_ratio_value
-        self.set_ratio_lim()
+        try:
+            _ = self.vol2.shape
+            self.set_ratio_lim()
+        except:
+            pass
 
         self.update()
 
@@ -1880,7 +1977,12 @@ class RenderVolumeVisual(Visual):
         # self._low_discard_filter_ratio_value /= self._clim_2[1] - self._clim_2[0]
 
         self.shared_program['u_low_discard_filter_ratio_value'] = self._low_discard_filter_ratio_value
-        self.set_ratio_lim()
+
+        try:
+            _ = self.vol2.shape
+            self.set_ratio_lim()
+        except:
+            pass
 
         self.update()
     
@@ -1901,14 +2003,16 @@ class RenderVolumeVisual(Visual):
         return self._compute_ratio
 
     @compute_ratio.setter
-    def compute_ratio(self, compute_ratio=False):
+    def compute_ratio(self, compute_ratio=''):
 
         self._compute_ratio = compute_ratio
 
-        if compute_ratio == 'log(A/B) (1)':
-            self._compute_ratio_index = 1
-        elif compute_ratio == 'log(A/B) (2)':
+        if compute_ratio == 'Ratio (global)':
             self._compute_ratio_index = 2
+            self.set_ratio_lim()
+        elif compute_ratio == 'Ratio (/voxel)':
+            self._compute_ratio_index = 1
+            self.set_ratio_lim()
         elif compute_ratio == 'abs(A-B)':
             self._compute_ratio_index = 3
         else:
