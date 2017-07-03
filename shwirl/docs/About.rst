@@ -4,7 +4,7 @@ About
 **Shwirl** is a custom standalone Python program to visualise spectral data cubes with ray-tracing volume rendering.
 The program has been developed to investigate transfer functions and graphics shaders as enablers for
 scientific visualisation of astronomical data. Details about transfer functions and shaders developed and implemented in
-**shwirl** can be found in a full length article by Vohl, Fluke, Barnes & Hassan (Submitted).
+**shwirl** can be found in a full length article by Vohl, Fluke, Barnes & Hassan (2017).
 
 A transfer function is an arbitrary function that combines volumetric elements (or voxels) to set the colour,
 intensity, or transparency level of each pixel in the final image. A graphics shader is an algorithmic kernel

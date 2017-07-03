@@ -12,7 +12,7 @@ Index
 spectral data cubes with ray-tracing volume rendering. The program has been developed to investigate transfer functions
 and graphics shaders as enablers for scientific visualisation of astronomical data. Details about the transfer functions
 and shaders developed and implemented in **shwirl** can be found in a full length article by Vohl, Fluke, Barnes &
-Hassan (Submitted).
+Hassan (2017).
 
 While the software is available for download and ready to visualise data,
 this is not intended as a full software release just yet.
