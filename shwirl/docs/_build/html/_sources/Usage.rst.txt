@@ -120,6 +120,11 @@ The information of the Primary Header is available in the metadata tab:
 
 .. image:: _static/9-metadata.png
 
+Computing an emission line ratio in 3D space
+--------------------------------------------
+
+The functionalities to compute an emission line ratio can currently be found in the `dev` branch on github.
+See Vohl, Fluke, Barnes & Hassan (2017) for more details. More to come soon.
 
 Axis labels
 -----------
