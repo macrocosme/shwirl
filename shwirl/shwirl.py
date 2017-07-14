@@ -6,9 +6,9 @@ import sys
 import numpy as np
 
 # Vispy imports
-from shwirl.extern.vispy import app, scene, io
-from shwirl.extern.vispy.color import get_colormaps
-from shwirl.shaders import RenderVolume
+from extern.vispy import app, scene, io
+from extern.vispy.color import get_colormaps
+from shaders import RenderVolume
 
 # Astropy imports
 from astropy.io import fits
@@ -736,6 +736,10 @@ class Canvas3D(scene.SceneCanvas):
                                    keys='interactive',
                                    size=(resolution.width(), resolution.height()),
                                    show=True)
+        self.unfreeze()
+        self.window_resolution = resolution
+        self.freeze()
+
         # self.measure_fps()
 
         self._configure_canvas()
@@ -796,7 +800,7 @@ class Canvas3D(scene.SceneCanvas):
 
         # 3D visualisation
         # row 0-1, column 1
-        self.view = self.grid.add_view(row=0, col=1, row_span=2,
+        self.view = self.grid.add_view(row=0, col=1, #row_span=2,
                                        border_color='#404040', bgcolor="#404040")
         self.view.camera = 'turntable'
         self.camera = self.view.camera
@@ -851,14 +855,24 @@ class Canvas3D(scene.SceneCanvas):
                                          border_color=border_color,
                                          **kwargs)
 
-        self.cbar.label.font_size = 15
-        self.cbar.label.color = "white"
-        self.cbar.ticks[0].font_size = 12
-        self.cbar.ticks[1].font_size = 12
-        self.cbar.ticks[0].color = "white"
-        self.cbar.ticks[1].color = "white"
+        # print ('window_resolution', self.window_resolution.width(), self.window_resolution.height())
 
-        CBAR_LONG_DIM = 200
+        if self.window_resolution.width() <= 3000:
+            CBAR_LONG_DIM = 150
+            self.cbar.label.font_size = 15
+            self.cbar.label.color = "white"
+            self.cbar.ticks[0].font_size = 12
+            self.cbar.ticks[1].font_size = 12
+            self.cbar.ticks[0].color = "white"
+            self.cbar.ticks[1].color = "white"
+        else:
+            CBAR_LONG_DIM = 300
+            self.cbar.label.font_size = 60
+            self.cbar.label.color = "white"
+            self.cbar.ticks[0].font_size = 45
+            self.cbar.ticks[1].font_size = 45
+            self.cbar.ticks[0].color = "white"
+            self.cbar.ticks[1].color = "white"
 
         # colorbar - column 1
         # view - column 2
@@ -923,7 +937,7 @@ class Canvas3D(scene.SceneCanvas):
             self._configure_canvas()
 
         self.unfreeze()
-        self.view = self.grid.add_view(row=0, col=1, row_span=2,
+        self.view = self.grid.add_view(row=0, col=1, #row_span=2,
                                        border_color='#404040', bgcolor="#404040")
 
         try:
@@ -1051,7 +1065,7 @@ class Canvas3D(scene.SceneCanvas):
                                            parent=self.view.scene,
                                            mode='lines')
 
-            from shwirl.extern.vispy.gloo import gl
+            from extern.vispy.gloo import gl
             gl.glLineWidth(1.5)
 
             self.view.add(self.axis)
@@ -1330,6 +1344,8 @@ def main():
 if __name__ == '__main__':
     appQt = QApplication(sys.argv)
     resolution = appQt.desktop().screenGeometry()
+    appQt.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    appQt.setAttribute(QtCore.Qt.QT_AUTO_SCREEN_SCALE_FACTOR)
 
     # Create and display the splash screen
     splash_pix = QPixmap('shwirl/images/splash_screen.png')

@@ -121,6 +121,8 @@ class _CoreColorBarVisual(Visual):
 
         x, y = self._pos
         halfw, halfh = self._halfdim
+        x += 2.5*halfw
+        # y += halfh
 
         # test that width and height are non-zero
         if halfw <= 0:
@@ -273,7 +275,8 @@ class ColorBarVisual(CompoundVisual):
     # The padding multiplier that's used to place the text
     # next to the Colorbar. Makes sure the text isn't
     # visually "sticking" to the Colorbar
-    text_padding_factor = 1.05
+    # text_padding_factor = 1.05
+    text_padding_factor = -0.95
 
     def __init__(self, cmap, orientation, size,
                  pos=[0, 0],
