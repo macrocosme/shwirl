@@ -54,6 +54,6 @@ A copy of the license is included within this repository.
 
 Copyright
 ---------
-Copyright (c) 2015, Dany Vohl
+Copyright (c) 2017, Dany Vohl
 All rights reserved.
 
