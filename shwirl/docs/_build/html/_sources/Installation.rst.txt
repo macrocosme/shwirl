@@ -20,7 +20,7 @@ Example installation procedure
 Depending on your operating system and your current configuration, installation steps may vary.
 In general, you can install it using the following:
 
-First, install Qt5. It can be downloaded via the `Qt website <qt-project.org/qt5>`_. You also need PyQt5,
+First, install Qt5. It can be downloaded via the `Qt website <http://qt-project.org/qt5>`_. You also need PyQt5,
 which can be installed via a package manager like pip, brew, etc. E.g.
 
 .. code:: console
