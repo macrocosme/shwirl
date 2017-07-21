@@ -20,7 +20,9 @@ and [VisPy](http://vispy.org), an object-oriented Python visualisation library b
 We implemented the algorithms in the fragment shader using the GLSL language.
 
 The software has been tested on Linux, Mac, and
-Windows machines, including remote desktop on cloud computing infrastructure. While the software is available for
+Windows machines, including remote desktop on cloud computing infrastructure.
+ 
+**Disclaimer**: While the software is available for
 download and ready to visualise data, this is not intended as a full software release just yet. 
 
 Documentation
