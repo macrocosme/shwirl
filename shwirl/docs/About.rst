@@ -31,3 +31,7 @@ Issues, requests and general inquiries
 --------------------------------------
 Please send issues, feature requests and/or general inquiries to Dany Vohl via http://macrocosme.github.io/#contact.
 You can also simply open a `new issue <https://github.com/macrocosme/shwirl/issues>`_ on github directly.
+
+Want to contribute?
+-------------------
+As mentioned above, shwirl is not intended to be a finished product yet. If you would like to contribute, GitHub pull requests are welcomed.

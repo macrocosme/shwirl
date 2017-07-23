@@ -14,7 +14,7 @@ and graphics shaders as enablers for scientific visualisation of astronomical da
 and shaders developed and implemented in **shwirl** can be found in a full length article by `Vohl, Fluke, Barnes &
 Hassan (2017) <https://academic.oup.com/mnras/article-lookup/doi/10.1093/mnras/stx1676>`_.
 
-While the software is available for download and ready to visualise data,
+**Disclaimer**: While the software is available for download and ready to visualise data,
 this is not intended as a full software release just yet.
 
 **Shwirl** is licensed under the terms of the `(new) BSD license <https://opensource.org/licenses/BSD-3-Clause>`_.
