@@ -6,9 +6,9 @@ import sys
 import numpy as np
 
 # Vispy imports
-from shwirl.extern.vispy import app, scene, io
-from shwirl.extern.vispy.color import get_colormaps
-from shwirl.shaders import RenderVolume
+from extern.vispy import app, scene, io
+from extern.vispy.color import get_colormaps
+from shaders import RenderVolume
 
 # Astropy imports
 from astropy.io import fits
@@ -113,7 +113,6 @@ class MainWindow(QMainWindow):
 
     def keyPressEvent(self, e):
         if e.key() == QtCore.Qt.Key_Escape:
-            print ("blabla")
             self.app.quit()
 
     def load_volume(self):
@@ -740,7 +739,7 @@ class Canvas3D(scene.SceneCanvas):
         self.window_resolution = resolution
         self.freeze()
 
-        # self.measure_fps()
+        self.measure_fps()
 
         self._configure_canvas()
 
@@ -1065,7 +1064,7 @@ class Canvas3D(scene.SceneCanvas):
                                            parent=self.view.scene,
                                            mode='lines')
 
-            from shwirl.extern.vispy.gloo import gl
+            from extern.vispy.gloo import gl
             gl.glLineWidth(1.5)
 
             self.view.add(self.axis)
@@ -1093,7 +1092,9 @@ class Canvas3D(scene.SceneCanvas):
 
             # self.histogram(data.ravel())
 
-
+            self.scalex = 1
+            self.scaley = 1
+            self.scalez = 1
 
             # self.rotation and self.timer used for autorotate.
             self.rotation = scene.MatrixTransform()
@@ -1202,6 +1203,11 @@ class Canvas3D(scene.SceneCanvas):
         self.volume.color_method = combo_color_method
         self.volume.interpolation = interpolation_method
 
+        print ('Transfer function:', tf_method)
+        print('Colour map:', cmap)
+        print('Colouring method:', combo_color_method)
+        print('Interpolation method:', interpolation_method)
+
         # print(self.volume.color_method)
         if (self.volume.color_method == 0):
             label = str(self.bunit)
@@ -1237,23 +1243,32 @@ class Canvas3D(scene.SceneCanvas):
             pass
 
     def set_color_scale(self, color_scale):
+        print ("Color scale:", color_scale)
         self.volume.color_scale = color_scale
 
     def set_filter_size(self, filter_size):
+        print("Box smoothing size:", filter_size)
         self.volume.filter_size = filter_size
 
     def set_filter_type(self, filter_type):
+        print("Filter type:", filter_type)
         self.volume.filter_type = filter_type
 
     def set_gaussian_filter(self, use_gaussian_filter, gaussian_filter_size):
+        if use_gaussian_filter == 1:
+            print("Gaussian smoothing:", use_gaussian_filter)
+            print("Gaussian smoothing size:", gaussian_filter_size)
+
         self.volume.use_gaussian_filter = use_gaussian_filter
         self.volume.gaussian_filter_size = gaussian_filter_size
 
     def set_high_discard_filter(self, high_discard_filter_value, scaled_value, filter_type):
+        print("High filter value:", scaled_value)
         self.volume.high_discard_filter_value = high_discard_filter_value
         self.update_clim("high", scaled_value, filter_type)
 
     def set_low_discard_filter(self, low_discard_filter_value, scaled_value, filter_type):
+        print("Low filter value:", scaled_value)
         self.volume.low_discard_filter_value = low_discard_filter_value
         self.update_clim("low", scaled_value, filter_type)
 
@@ -1268,12 +1283,15 @@ class Canvas3D(scene.SceneCanvas):
 
     def set_density_factor(self, density_factor):
         # print (density_factor)
+        print("Density factor:", density_factor)
         self.volume.density_factor = density_factor
 
     def set_fov(self, fov):
+        print("Field of view:", fov)
         self.view.camera.fov = fov
 
     def set_camera(self, cam, fov):
+        print("Camera type:", cam)
         if cam == 'Perspectivecamera':
             self.view.camera = scene.cameras.PerspectiveCamera(parent=self.view.scene,
                                                                fov=float(fov),
@@ -1295,6 +1313,7 @@ class Canvas3D(scene.SceneCanvas):
                                                            name='Arcball')
 
     def set_autorotate(self, flag):
+        print("Autorotate:", flag)
         if flag == True:
             # self.set_camera("Perspectivecamera", 60)
             # self.timer.start(0.01, 100)
@@ -1313,6 +1332,18 @@ class Canvas3D(scene.SceneCanvas):
         self.volume.log_scale = flag
 
     def set_scaling(self, scalex, scaley, scalez):
+        if self.scalex != scalex:
+            self.scalex = scalex
+            print("Scaling x axis:", scalex)
+            
+        if self.scaley != scaley:
+            self.scaley = scaley
+            print("Scaling y axis:", scaley)
+            
+        if self.scalez != scalez:
+            self.scalez = scalez
+            print("Scaling z axis:", scalez)
+            
         # TODO: get translation right to stay centered.
         self.axis.transform = self.volume.transform = scene.STTransform(scale=(scalex, scalez, scaley),
                                                                         translate=(
@@ -1344,8 +1375,8 @@ def main():
 if __name__ == '__main__':
     appQt = QApplication(sys.argv)
     resolution = appQt.desktop().screenGeometry()
-    appQt.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-    appQt.setAttribute(QtCore.Qt.QT_AUTO_SCREEN_SCALE_FACTOR)
+    # appQt.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    # appQt.setAttribute(QtCore.Qt.QT_AUTO_SCREEN_SCALE_FACTOR)
 
     # Create and display the splash screen
     splash_pix = QPixmap('shwirl/images/splash_screen.png')
