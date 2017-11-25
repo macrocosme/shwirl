@@ -3,3 +3,6 @@ include LICENSE
 
 # Include the data files
 recursive-include shwirl *.*
+
+prune shwirl/docs/
+prune README.md

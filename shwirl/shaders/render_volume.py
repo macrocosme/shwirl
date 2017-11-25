@@ -42,12 +42,12 @@ from __future__ import division
 # A copy of the license is available in the root directory of this project.
 #
 
-from shwirl.extern.vispy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
-from shwirl.extern.vispy.visuals import Visual
-from shwirl.extern.vispy.visuals.shaders import Function
-from shwirl.extern.vispy.color import get_colormap
-from shwirl.extern.vispy.scene.visuals import create_visual_node
-from shwirl.extern.vispy.io import load_spatial_filters
+from ..extern.vispy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
+from ..extern.vispy.visuals import Visual
+from ..extern.vispy.visuals.shaders import Function
+from ..extern.vispy.color import get_colormap
+from ..extern.vispy.scene.visuals import create_visual_node
+from ..extern.vispy.io import load_spatial_filters
 
 import numpy as np
 

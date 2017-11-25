@@ -7,17 +7,17 @@ from os import path
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.md'), encoding='utf-8') as f:
-    long_description = f.read()
+# with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+#     long_description = f.read()
 
-package_data = {'shwirl.images': ['*.png']}
+package_data = {'.images': ['*.png']}
 
 for subpackage in ['antialias', 'arrowheads', 'arrows', 'collections',
                    'colormaps', 'lines', 'markers', 'math', 'misc',
                    'transforms']:
-    package_data['shwirl.extern.vispy.glsl.' + subpackage] = ['*.vert','*.frag', "*.glsl"]
+    package_data['.extern.vispy.glsl.' + subpackage] = ['*.vert','*.frag', "*.glsl"]
 
-for subpackage in ['shwirl.extern.vispy.io._data']:
+for subpackage in ['.extern.vispy.io._data']:
     package_data[subpackage] = ['*.npy', '*.*']
 
 setup(
@@ -26,10 +26,10 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1.3',
+    version='0.1.11',
 
     description='Meaningful colouring of spectral cube data with volume rendering',
-    long_description=long_description,
+    # long_description=long_description,
 
     # The project's main homepage.
     url='https://github.com/macrocosme/shwirl',
@@ -107,6 +107,8 @@ setup(
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=['scipy', 'numpy', 'astropy', 'PyOpenGL', 'six'],
+
+    include_package_data=True,
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,

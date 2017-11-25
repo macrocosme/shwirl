@@ -6,9 +6,9 @@ import sys
 import numpy as np
 
 # Vispy imports
-from shwirl.extern.vispy import app, scene, io
-from shwirl.extern.vispy.color import get_colormaps
-from shwirl.shaders import RenderVolume
+from .extern.vispy import app, scene, io
+from .extern.vispy.color import get_colormaps
+from .shaders import RenderVolume
 
 # Astropy imports
 from astropy.io import fits
