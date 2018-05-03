@@ -37,7 +37,21 @@ except:
         exit()
 
 class MainWindow(QMainWindow):
+    """MainWindow class.
+
+    This class manages the main Qt window. It includes the initialisation,
+    and several functions to handle events.
+    """
     def __init__(self, resolution):
+        """Initialise the main window, set the basic layout, and connect signals (events handling).
+
+        Parameters
+        ----------
+            resolution (list):  The resolution of the QWindow in pixel (e.g. appQt.desktop().screenGeometry())
+
+        Returns:
+            nothing.
+        """
         QMainWindow.__init__(self)
 
         # self.resize(1800, 1000)
@@ -112,11 +126,25 @@ class MainWindow(QMainWindow):
         QApplication.setStyle(QStyleFactory.create('Cleanlooks'))
 
     def keyPressEvent(self, e):
+        """Handle the event where a key is pressed.
+
+        Parameters
+        ----------
+            e (event):  the event.
+
+        """
         if e.key() == QtCore.Qt.Key_Escape:
             print ("blabla")
             self.app.quit()
 
     def load_volume(self):
+        """Load a volume (3D array).
+
+        This function calls the different functions implied when loading a volume.
+        In particular, it transmits the data to the Canvas3D class (set_volume_scene),
+        prints the HDU information, set the min and max values based on data, enables widgets,
+        sets rendering parameters and view.
+        """
         self.Canvas3D.set_volume_scene(self.props['load_button'].loaded_cube)
         self.fits_infos.print_header(self.props['load_button'].loaded_cube[0].header)
 
@@ -130,79 +158,134 @@ class MainWindow(QMainWindow):
             self.update_view()
 
     def update_rendering_param(self):
-        # tf_method, cmap
-        self.Canvas3D.set_data(self.props['rendering_params'].combo_tf_method.currentText(),
+        """Update the rendering parameter.
+
+        Transmits the updated rendering parameter to the Canvas3D class (Canvas3D.set_rendering_params). If the
+        current transfer function is local maximum intensity projection (lmip), it also update the
+        related threshold value.
+        """
+        self.Canvas3D.set_rendering_params(self.props['rendering_params'].combo_tf_method.currentText(),
                                self.props['rendering_params'].combo_cmap.currentText(),
                                self.props['rendering_params'].combo_color_method.currentText(),
                                self.props['rendering_params'].combo_interpolation_method.currentText())
 
         if self.props['rendering_params'].combo_tf_method.currentText() == 'lmip':
-            # print("thres", self.props['rendering_params'].l_threshold_value.text())
-            # self.update_threshold(self.props.l_threshold_value.text())
             self.update_threshold()
 
     def update_view(self):
+        """Update the view parameters (e.g. camera, field of view)
+
+        Transmits the updated view parameter to set the camera in the Canvas3D class (Canvas3D.set_camera).
+        """
         self.Canvas3D.set_camera(self.props['view'].combo_camera.currentText(),
                                  self.props['view'].slider_fov.value())
 
     def update_fov(self):
+        """Update field of view (fov)
+
+        Transmits the value from the field of view slider to the Canvas3D class (Canvas3D.set_fov).
+        """
         self.Canvas3D.set_fov(self.props['view'].slider_fov.value())
 
     def update_autorotate(self):
+        """Update autorotate boolean value
+
+        Transmits autorotate's checkbox value to the Canvas3D class (Canvas3D.set_autorotate).
+        """
         self.Canvas3D.set_autorotate(self.props['view'].chk_autorotate.isChecked())
 
-    # def update_log_scale(self):
-    #     self.Canvas3D.set_log_scale(self.props['view'].chk_log_scale.isChecked())
-
     def update_scaling(self):
+        """Update scaling value for either axis
+
+        Transmits the scaling sliders values to the Canvas3D class (Canvas3D.set_scaling).
+        """
         self.Canvas3D.set_scaling(self.props['view'].slider_scalex.value(),
                                   self.props['view'].slider_scaley.value(),
                                   self.props['view'].slider_scalez.value())
 
     def update_threshold(self):
+        """Update threshold value
+
+        Transmits the threshold sliders value to the Canvas3D class (Canvas3D.set_threshold).
+        """
         self.Canvas3D.set_threshold(self.props['rendering_params'].l_threshold_value.text())
 
     def update_color_scale(self):
+        """Update color scale value
+
+        Transmits the color scale combo box value to the Canvas3D class (Canvas3D.set_threshold).
+
+        warning:
+
+            Color scaling is not currently used. Some code is written, but not yet functional.
+        """
         self.Canvas3D.set_color_scale(self.props['rendering_params'].combo_color_scale.currentText())
 
     def update_density_factor(self):
+        """Update density factor value
+
+        Transmits the density factor slider value to the Canvas3D class (Canvas3D.set_density_factor).
+        This is used with the AVIP transfer function.
+        """
         self.Canvas3D.set_density_factor(self.props['rendering_params'].l_density_factor_value.text())
 
     def update_filter_size(self):
-        self.Canvas3D.set_filter_size(self.props['smoothing'].l_filter_size_value.text())
+        """Update the filter size value
+
+        Transmits the box filter and gaussian filter size relevant values to the Canvas3D class
+        (Canvas3D.set_box_filter_size, and Canvas3D.set_gaussian_filter respectively).
+        """
+        self.Canvas3D.set_box_filter_size(self.props['smoothing'].l_filter_size_value.text())
         self.Canvas3D.set_gaussian_filter(self.props['smoothing'].chk_use_gaussian_filter.isChecked(),
                                           self.props['smoothing'].combo_gaussian_filter_size.currentText())
 
     def signal_filter_type(self):
+        """Qt signal - filter type
+
+        This function is called when the filter type is changed in the GUI. It transmits the
+        filter type to the Canvas3D class (Canvas3D.set_filter_type).
+        """
         self.Canvas3D.set_filter_type(self.props['filtering'].combo_filter_type.currentText())
 
     def update_high_discard_filter(self):
+        """Update the high discard filter value
+
+        Transmits the high discard filter value, scaled value, and the type of filtering to the Canvas3D class
+        (Canvas3D.set_high_discard_filter).
+        """
         self.Canvas3D.set_high_discard_filter(self.props['filtering'].l_high_discard_filter_value.text(),
                                               self.props['filtering'].high_scaled_value,
                                               self.props['filtering'].combo_filter_type.currentText())
 
     def update_low_discard_filter(self):
+        """Update the low discard filter value
+
+        Transmits the low discard filter value, scaled value, and the type of filtering to the Canvas3D class
+        (Canvas3D.set_low_discard_filter).
+        """
         self.Canvas3D.set_low_discard_filter(self.props['filtering'].l_low_discard_filter_value.text(),
                                              self.props['filtering'].low_scaled_value,
                                              self.props['filtering'].combo_filter_type.currentText())
 
     def export_image(self):
+        """Export an image of the view.
+
+        Open a dialog window to decide where to save the image, and what name it should have. Then, saves the image.
+        """
         fileName = QFileDialog.getSaveFileName(self,
-                                                         'Save still image',
-                                                         filter='Images (*.png)')
+                                               'Save still image',
+                                               filter='Images (*.png)')
         if fileName[0] != '':
             img = self.Canvas3D.render()
             io.write_png(fileName[0], img)
 
 
 class FitsMetaWidget(QWidget):
-    """
-    Widget for editing Volume parameters
-    """
-
-    # signal_objet_changed = pyqtSignal(name='objectChanged')
+    """Widget to render the FITS HDU information"""
 
     def __init__(self, parent=None):
+        """Initialise the layout, including QTextEdit widget.
+        """
         super(FitsMetaWidget, self).__init__(parent)
 
         l_title = QLabel("Fits Primary Header")
@@ -226,6 +309,13 @@ class FitsMetaWidget(QWidget):
         self.setLayout(vbox)
 
     def print_header(self, header):
+        """Print the Primary HDU information of the fits file
+
+        Parameters
+        ----------
+            header : astropy.io.fits.header, dict
+                HDU taken from a fits file.
+        """
         self.l_header.clear()
         self.l_header.insertPlainText('card\tvalue\tcomment\n')
         for card in header.cards:
@@ -241,8 +331,7 @@ class FitsMetaWidget(QWidget):
 
 
 class ObjectWidget(QWidget):
-    """
-    Widget for editing Volume parameters
+    """Class for the object widget creating the Qt signals
     """
     signal_objet_changed = pyqtSignal(name='objectChanged')
     signal_file_loaded = pyqtSignal(name='fileLoaded')
@@ -261,6 +350,18 @@ class ObjectWidget(QWidget):
     signal_export_image = pyqtSignal(name='export_image')
 
     def __init__(self, type, parent=None):
+        """Initialise the ObjectWidget class
+
+        Instanciate the widget's components for a given `type` of widget.
+
+        Parameters
+        -----------
+            type : str
+                Type of widget (one of MainWindow.widget_types).
+
+            parent : class
+                Parent class.
+        """
         super(ObjectWidget, self).__init__(parent)
 
         self.loaded_cube = None
@@ -271,6 +372,17 @@ class ObjectWidget(QWidget):
         self.widgets_group_array = []
 
         def serialize_widgets(key, group, array):
+            """Serialize widgets
+
+            Add a new widget to a widget array using its key, and a group it belongs to.
+
+            Parameters
+            ----------
+            key : str
+                Key used to describe the widget
+            group : str
+            array : list
+            """
             self.widgets_array.append(array)
             self.widgets_dict[key] = array
             try:
@@ -282,7 +394,7 @@ class ObjectWidget(QWidget):
 
         if type == 'load_button':
             self.load_button = QPushButton("Load Spectral Cube", self)
-            self.load_button.clicked.connect(self.showDialog)
+            self.load_button.clicked.connect(self.showLoadFitsDialog)
             array = [self.load_button]
             serialize_widgets('fits_button', '', array)
 
@@ -492,7 +604,6 @@ class ObjectWidget(QWidget):
         # groupboxes = []
         # groupbox = QGroupBox(group)
 
-
         # Add widgets to the grid layout, which is added to the box, which is added to the group.
         widgets_i = 0
         gbox2 = QGridLayout()
@@ -529,7 +640,9 @@ class ObjectWidget(QWidget):
 
         self.setLayout(vbox)
 
-    def update_param(self, option):
+    def update_param(self):
+        """Update parameter related to a given transfer function.
+        """
         if self.combo_tf_method.currentText() in ['avip', 'translucent2']:
             for widget in self.widgets_dict['density_factor']:
                 widget.show()
@@ -546,11 +659,12 @@ class ObjectWidget(QWidget):
 
         self.signal_objet_changed.emit()
 
-    def showDialog(self):
+    def showLoadFitsDialog(self):
+        """Show the dialog window to load a fits file.
+        """
         filename = QFileDialog.getOpenFileName(self,
-                                                         'Open file',
-                                                         filter='FITS Images (*.fits, *.FITS)')
-        # '/Users/danyvohl/code/data')
+                                               'Open file',
+                                               filter='FITS Images (*.fits, *.FITS)')
 
         if filename[0] != "":
             # Load file
@@ -585,7 +699,15 @@ class ObjectWidget(QWidget):
             # self.signal_camera_changed.emit()
 
     def update_discard_filter_text(self, min, max):
-        # Update label
+        """Update the discard filter text field.
+
+        Parameters
+        ----------
+        min : int, float
+            Minimum value to be used by the filter
+        max : int, float
+            Maximum value to be used by the filter
+        """
         self.vol_min = min
         self.vol_max = max
         try:
@@ -595,11 +717,19 @@ class ObjectWidget(QWidget):
             pass
 
     def enable_widgets(self):
+        """Enable widgets.
+
+        At launch, all widgets except the `load fits` button are disabled. This function enables all widgets.
+        """
         for widgets in self.widgets_array:
             for widget in widgets:
                 widget.setEnabled(True)
 
     def format_digits(self, value):
+        """Format digits to be printed.
+
+        This function converts a numerical value to string
+        """
         if isinstance(value, int):
             return str(value)
         else:
@@ -608,26 +738,50 @@ class ObjectWidget(QWidget):
     # def update_clim(self):
     #     self.signal_file_loaded.emit()
 
-    def update_view(self, option):
+    def update_view(self):
+        """Update view.
+
+        Emits the Qt signal informing that the camera has changed.
+        """
         self.signal_camera_changed.emit()
 
     def update_fov(self):
+        """Update view.
+
+        Updates the field of view value text string.
+        Emits the Qt signal informing that the field of view has changed.
+        """
         self.l_fov_value.setText(str(self.slider_fov.value()))
         self.signal_fov_changed.emit()
 
     def update_autorotate(self):
+        """Update autorotate.
+
+        Emits the Qt signal informing that autorotate has changed.
+        """
         self.signal_autorotate_changed.emit()
 
     # def update_log_scale(self):
     #     self.signal_log_scale_changed.emit()
 
     def update_scaling(self):
+        """Update scaling.
+
+        Updates the scale (x,y,z) value text strings.
+        Emits the Qt signal informing that scaling has changed.
+        """
         self.l_scalex_value.setText(str(self.slider_scalex.value()))
         self.l_scaley_value.setText(str(self.slider_scaley.value()))
         self.l_scalez_value.setText(str(self.slider_scalez.value()))
         self.signal_scaling_changed.emit()
 
     def update_threshold(self):
+        """Update threshold.
+
+        Computes the scaled value relative to the global min max of the data.
+        Updates the threshold text field with the new scaled_value.
+        Emits the Qt signal informing that threshold has changed.
+        """
         scaled_value = self.scale_value(self.slider_threshold.value(),
                                         self.slider_threshold.minimum(),
                                         self.slider_threshold.maximum(),
@@ -638,13 +792,26 @@ class ObjectWidget(QWidget):
         self.signal_threshold_changed.emit()
 
     def update_color_scale(self):
+        """Update color scale.
+
+        Emits the Qt signal informing that color scale has changed.
+        """
         self.signal_color_scale_changed.emit()
 
     def update_filter_size(self):
+        """Update filter size.
+
+        Updates the filter size text field.
+        Emits the Qt signal informing that filter size has changed.
+        """
         self.l_filter_size_value.setText(str(self.slider_filter_size.value() + self.slider_filter_size.value() + 1))
         self.signal_filter_size_changed.emit()
 
     def update_filter_type(self):
+        """Update filter type.
+
+        Emits the Qt signal informing that filter type has changed.
+        """
         # if self.combo_filter_type.currentText() == 'Rescale':
         #     for widget in self.widgets_dict['high_discard_filter']:
         #         widget.show()
@@ -657,10 +824,19 @@ class ObjectWidget(QWidget):
         self.signal_filter_type_changed.emit()
 
     def update_gaussian_filter_size(self):
+        """Update gaussian filter kernel size
+
+        Emits the Qt signal informing that gaussian filter kernel size has changed.
+        """
         self.signal_filter_size_changed.emit()
 
     def update_high_discard_filter(self):
+        """Update the high discard filter value.
 
+        Computes the scaled value relative to the global min max of the data.
+        Updates the high discard filter text field with the new scaled value.
+        Emits the Qt signal informing that high discard filter has changed.
+        """
         # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
 
         self.high_scaled_value = self.scale_value(self.slider_high_discard_filter.value(),
@@ -677,6 +853,12 @@ class ObjectWidget(QWidget):
         self.signal_high_discard_filter_changed.emit()
 
     def update_low_discard_filter(self):
+        """Update the low discard filter value.
+
+        Computes the scaled value relative to the global min max of the data.
+        Updates the low discard filter text field with the new scaled value.
+        Emits the Qt signal informing that low discard filter has changed.
+        """
 
         # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
 
@@ -694,6 +876,12 @@ class ObjectWidget(QWidget):
         self.signal_low_discard_filter_changed.emit()
 
     def update_density_factor(self):
+        """Update the density factor.
+
+        Computes the scaled value relative to the global min max of the data.
+        Updates the density factor text field with the new scaled value.
+        Emits the Qt signal informing that high discard filter has changed.
+        """
         scaled_value = self.format_digits(self.scale_value(self.slider_density_factor.value(),
                                                            self.slider_density_factor.minimum(),
                                                            self.slider_density_factor.maximum(),
@@ -704,15 +892,25 @@ class ObjectWidget(QWidget):
         self.signal_density_factor_changed.emit()
 
     def scale_value(self, old_value, old_min, old_max, new_min, new_max):
-        """
-        Scale a value from it's original range to another, arbitrary, range
+        """Scale a value from it's original range to another, arbitrary, range.
 
-        :param old_value: Value to be scaled
-        :param old_min: Minimum of the original range
-        :param old_max: Maximum of the original range
-        :param new_min: Minimum of the new range
-        :param new_max: Maximum of the new range
-        :return: Scaled value
+        Parameters
+        ----------
+        old_value : int, float
+            Value to be scaled
+        old_min : int, float
+            Minimum of the original range
+        old_max : int, float
+            Maximum of the original range
+        new_min : int, float
+            Minimum of the new range
+        new_max : int, float
+            Maximum of the new range
+
+        Return
+        ------
+            new_value : float
+                Scaled value
         """
         old_range = old_max - old_min
         if old_range == 0:
@@ -724,11 +922,23 @@ class ObjectWidget(QWidget):
         return new_value
 
     def export_image(self):
+        """Export image.
+
+        Emits the Qt signal informing that export image has been triggered.
+        """
         self.signal_export_image.emit()
 
 
 class Canvas3D(scene.SceneCanvas):
+    """Class describing the 3D canvas where the visualisation is plotted"""
     def __init__(self, resolution):
+        """Initialise the vispy canvas3D
+
+        Parameters
+        ----------
+        resolution : appQt.desktop().screenGeometry()
+            Width and height of the canvas.
+        """
         self._configured = False
         self._fg = (0.5, 0.5, 0.5, 1)
 
@@ -748,6 +958,11 @@ class Canvas3D(scene.SceneCanvas):
         # scene.visuals.XYZAxis(parent=self.view.scene)
 
     def _configure_canvas(self):
+        """Configure the vispy canvas
+
+        Sets the background color, add and configure the grid to define where the colorbar and
+        the main visualisation will be.
+        """
         self.unfreeze()
 
         # Set up a viewbox to display the image with interactive pan/zoom
@@ -760,6 +975,8 @@ class Canvas3D(scene.SceneCanvas):
         self.freeze()
 
     def _configure_3d(self):
+        """Configure the vispy canvas grid.
+        """
         if self._configured:
             return
 
@@ -915,11 +1132,6 @@ class Canvas3D(scene.SceneCanvas):
             Color of the histogram.
         orientation : {'h', 'v'}
             Orientation of the histogram.
-
-        Returns
-        -------
-        hist : instance of Polygon
-            The histogram polygon.
         """
         self.view_histogram = self.grid.add_view(row=1, col=0, border_color='#404040', bgcolor="#404040")
         self.view_histogram.camera = 'panzoom'
@@ -931,6 +1143,20 @@ class Canvas3D(scene.SceneCanvas):
         # return self.hist
 
     def set_volume_scene(self, cube):
+        """Set volume scene
+
+        Configures the vispy canvas to display the 3D visualisation.
+
+        Parameters
+        ----------
+        cube : astropy.io.fits
+            FITS file opened with astropy.io.fits containing the volumetric data (e.g. spectral cube).
+
+        TO DO
+        -----
+        Move some of the code from this function to atomic functions (e.g. header information for cmap).
+
+        """
         # # Set up a viewbox to display the image with interactive pan/zoom
         if self.view:
             canvas = self.central_widget.remove_widget(self.grid)
@@ -1109,6 +1335,11 @@ class Canvas3D(scene.SceneCanvas):
     def create_cube(self, shape):
         """ Generate vertices & indices for a filled and outlined cube
 
+        Parameters
+        ----------
+        shape : list
+            List representing the shape of the numpy array.
+
         Returns
         -------
         vertices : array
@@ -1195,8 +1426,20 @@ class Canvas3D(scene.SceneCanvas):
 
         return vertices, filled, outline
 
-    # def set_data(self, data, tf_method, cmap, clim_min, clim_max):
-    def set_data(self, tf_method, cmap, combo_color_method, interpolation_method):
+    def set_rendering_params(self, tf_method, cmap, combo_color_method, interpolation_method):
+        """Set rendering parameters for the visualised volume.
+
+        Parameters
+        ----------
+        tf_method : str
+            Transfer function method
+        cmap : str
+            Color map (e.g. hot, RbBl...)
+        combo_color_method : str
+            Color method (e.g. mom0, mom1, rgb)
+        interpolation_method : str
+            Interpolation method
+        """
         self.volume.method = tf_method
         self.volume.cmap = cmap
         self.volume.color_method = combo_color_method
@@ -1218,9 +1461,15 @@ class Canvas3D(scene.SceneCanvas):
         self.cbar.label_str = label
         self.cbar.cmap = cmap
 
-        # self.volume.set_data(data, [clim_min, clim_max])
+        # self.volume.set_rendering_params(data, [clim_min, clim_max])
 
     def set_threshold(self, threshold):
+        """Set threshold value for the visualised volume.
+
+        Parameters
+        ----------
+        threshold : int, float
+        """
         try:
             threshold = float(threshold)
         except:
@@ -1237,27 +1486,92 @@ class Canvas3D(scene.SceneCanvas):
             pass
 
     def set_color_scale(self, color_scale):
+        """Set color scale value for the visualised volume.
+
+        Parameters
+        ----------
+        color_scale: str
+            Scaling function (e.g. linear, log, exp)
+        """
         self.volume.color_scale = color_scale
 
-    def set_filter_size(self, filter_size):
+    def set_box_filter_size(self, filter_size):
+        """Set box filter kernel size value for the visualised volume.
+
+        Parameters
+        ----------
+        filter_size: int
+            Filter kernel size. Number of neighbours considered during the convolution.
+        """
         self.volume.filter_size = filter_size
 
     def set_filter_type(self, filter_type):
+        """Set box filter type for the visualised volume.
+
+        The two filter methods currently available are `filter out`, or `rescale`.
+
+        Parameters
+        ----------
+        filter_type : int
+            Type of filter
+        """
         self.volume.filter_type = filter_type
 
     def set_gaussian_filter(self, use_gaussian_filter, gaussian_filter_size):
+        """Set gaussian filter parameters.
+
+        Parameters
+        ----------
+        use_gaussian_filter : int
+            0 or 1, compute the gaussian filter (1) or not (0).
+        gaussian_filter_size : int
+            Size of the kernel. Number of neighbours considered during the convolution.
+        """
         self.volume.use_gaussian_filter = use_gaussian_filter
         self.volume.gaussian_filter_size = gaussian_filter_size
 
     def set_high_discard_filter(self, high_discard_filter_value, scaled_value, filter_type):
+        """Set high discard filter value (values higher than this will be discarded).
+
+        Parameters
+        ----------
+        high_discard_filter_value : int, float
+            Upper limit.
+        scaled_value : int, float
+            High discard value scaled to data range
+        filter_type : str
+            Filter type
+        """
         self.volume.high_discard_filter_value = high_discard_filter_value
         self.update_clim("high", scaled_value, filter_type)
 
     def set_low_discard_filter(self, low_discard_filter_value, scaled_value, filter_type):
+        """Set low discard value (values lower than this will be discarded).
+
+        Parameters
+        ----------
+        low_discard_filter_value : int, float
+            Lower limit
+        scaled_value : int, float
+            Scaled value
+        filter_type : str
+            Filter type
+        """
         self.volume.low_discard_filter_value = low_discard_filter_value
         self.update_clim("low", scaled_value, filter_type)
 
     def update_clim(self, type, value, filter_type):
+        """Update color limit (clim)
+
+        Parameters
+        ----------
+        type : str
+            bound type (low or high)
+        value : int, float
+            New value to be set
+        filter_type : str
+            Filter type
+        """
         # print("self.volume.color_method", self.volume.color_method)
         if self.volume.color_method == 0:
             if filter_type == 'Rescale':
@@ -1267,13 +1581,36 @@ class Canvas3D(scene.SceneCanvas):
                     self.cbar.clim = [self.cbar.clim[0], value]
 
     def set_density_factor(self, density_factor):
+        """Set density factor
+
+        Parameters
+        ----------
+        density_factor : int, float
+            Factor used with AVIP to set the transparency level
+        """
         # print (density_factor)
         self.volume.density_factor = density_factor
 
     def set_fov(self, fov):
+        """Set the field of view of the camera.
+
+        Parameters
+        ----------
+        fov : int, float
+            Field of view
+        """
         self.view.camera.fov = fov
 
     def set_camera(self, cam, fov):
+        """Set camera type.
+
+        Parameters
+        ----------
+        cam : str
+            Camera type (based on vispy's cameras)
+        fov : int, float
+            Camera's field of view
+        """
         if cam == 'Perspectivecamera':
             self.view.camera = scene.cameras.PerspectiveCamera(parent=self.view.scene,
                                                                fov=float(fov),
@@ -1295,6 +1632,13 @@ class Canvas3D(scene.SceneCanvas):
                                                            name='Arcball')
 
     def set_autorotate(self, flag):
+        """Set autorotate value.
+
+        Parameters
+        ----------
+        flag : bool
+            Should it autorotate or not. True: autorotate. False: will not autorotate
+        """
         if flag == True:
             # self.set_camera("Perspectivecamera", 60)
             # self.timer.start(0.01, 100)
@@ -1303,6 +1647,10 @@ class Canvas3D(scene.SceneCanvas):
             self.timer.stop()
 
     def rotate(self, event):
+        """Perform a rotation of the visualisation.
+
+        Function to which a timer connects to.
+        """
         # self.angle += .005
         self.angle = 3.6
         # self.rotation.rotate(self.angle, (0, 0, 1))
@@ -1310,15 +1658,41 @@ class Canvas3D(scene.SceneCanvas):
         self.view.camera.orbit(self.angle, 0)
 
     def set_log_scale(self, flag):
+        """Set the log scaling.
+
+        Parameters
+        ----------
+        flag : bool
+            Log scale or not.
+
+        Note
+        ----
+        Not currently being used.
+        """
         self.volume.log_scale = flag
 
     def set_scaling(self, scalex, scaley, scalez):
+        """Set x, y, or z scaling (transform).
+
+        Parameters
+        ----------
+        scalex : int, float
+            scaling factor for the x axis
+        scaley: int, float
+            scaling factor for the y axis
+        scalez: int, float
+            scaling factor for the z axis
+        """
         # TODO: get translation right to stay centered.
         self.axis.transform = self.volume.transform = scene.STTransform(scale=(scalex, scalez, scaley),
                                                                         translate=(
                                                                         -scalex ** 2, -scalez ** 2, -scaley ** 2))
 
     def set_transform(self, x, y, z):
+        """Set the transform.
+
+        Deprecated.
+        """
         self.unfreeze()
         self.axis.transform = self.volume.transform = scene.STTransform(translate=(x, y, z))
         self.freeze()
