@@ -9,16 +9,12 @@ Index
 .. image:: _static/shwirl_splash.png
 
 .. image:: https://img.shields.io/badge/ascl-1704.003-blue.svg?colorB=262255
-:target: http://ascl.net/1704.003
-:alt: ascl:1704.003
-
-.. image:: https://readthedocs.org/projects/shwirl/badge/?version=latest
-:target: http://shwirl.readthedocs.io/en/latest/?badge=latest
-:alt: Documentation Status
+   :target: http://ascl.net/1704.003
+   :alt: ascl:1704.003
 
 .. image:: http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
-:target: http://www.astropy.org/
-:alt: astropy
+   :target: http://www.astropy.org/
+   :alt: astropy
 
 `Shwirl <https://github.com/macrocosme/shwirl>`_ is a custom standalone Python program to visualise
 spectral data cubes with ray-tracing volume rendering. The program has been developed to investigate transfer functions
@@ -39,4 +35,4 @@ this is not intended as a full software release just yet.
    Installation
    Usage
    Example
-   Shwirl
+   shwirl
