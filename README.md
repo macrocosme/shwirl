@@ -50,8 +50,7 @@ and run with
 
 Issues, requests and general inquiries
 --------------------------------------
-Please send issues, feature requests and/or general inquiries to Dany Vohl via http://macrocosme.github.io/#contact.
-You can also simply open a [new issue](https://github.com/macrocosme/shwirl/issues) on github directly.
+Please list issues, feature requests and/or general inquiries by creating a [new issue](https://github.com/macrocosme/shwirl/issues).
 
 Want to contribute?
 -------------------
