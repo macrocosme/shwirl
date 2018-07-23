@@ -42,16 +42,16 @@ from __future__ import division
 # A copy of the license is available in the root directory of this project.
 #
 
-from ..extern.vispy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
-from ..extern.vispy.visuals import Visual
-from ..extern.vispy.visuals.shaders import Function
-from ..extern.vispy.color import get_colormap
-from ..extern.vispy.scene.visuals import create_visual_node
-from ..extern.vispy.io import load_spatial_filters
+from vispy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
+from vispy.visuals import Visual
+from vispy.visuals.shaders import Function
+from vispy.color import get_colormap
+from vispy.scene.visuals import create_visual_node
+from vispy.io import load_spatial_filters
 
 import numpy as np
 
-# Vertex shader
+# VERTEX SHADER
 VERT_SHADER = """
 attribute vec3 a_position;
 // attribute vec3 a_texcoord;
@@ -82,237 +82,67 @@ void main() {
 }
 """  # noqa
 
-# Fragment shader
-FRAG_SHADER = """
-// uniforms
-uniform $sampler_type u_volumetex;
-uniform vec3 u_shape;
-uniform vec3 u_resolution;
-uniform float u_threshold;
-uniform float u_relative_step_size;
-//uniform int u_color_scale;
-//uniform float u_data_min;
-//uniform float u_data_max;
+# Fragment shader units
+FRAG_INIT_UNIFORMS = """
+    // uniforms
+    uniform $sampler_type u_volumetex;
+    uniform vec3 u_shape;
+    uniform vec3 u_resolution;
+    uniform float u_threshold;
+    uniform float u_relative_step_size;
+    //uniform int u_color_scale;
+    //uniform float u_data_min;
+    //uniform float u_data_max;
+    
+    // Moving box smoothing uniforms
+    uniform int u_filter_size;
+    uniform float u_filter_coeff;
+    uniform int u_filter_arm;
+    uniform int u_filter_type;
+    
+    // Gaussian smoothing
+    uniform int u_use_gaussian_filter;
+    uniform int u_gaussian_filter_size;
+    
+    //uniform int u_log_scale;
+    
+    // Volume Stats
+    //uniform float u_volume_mean;
+    //uniform float u_volume_std;
+    //uniform float u_volume_madfm;
+    uniform float u_high_discard_filter_value;
+    uniform float u_low_discard_filter_value;
+    uniform float u_density_factor;
+    
+    uniform int u_color_method;
+"""
+FRAG_INIT_VARYINGS = """
+    //varyings
+    // varying vec3 v_texcoord;
+    varying vec3 v_position;
+    varying vec4 v_nearpos;
+    varying vec4 v_farpos;
+"""
+FRAG_INIT_CONSTS = """
+    // uniforms for lighting. Hard coded until we figure out how to do lights
+    const vec4 u_ambient = vec4(0.2, 0.4, 0.2, 1.0);
+    const vec4 u_diffuse = vec4(0.8, 0.2, 0.2, 1.0);
+    const vec4 u_specular = vec4(1.0, 1.0, 1.0, 1.0);
+    const float u_shininess = 40.0;
+"""
+FRAG_INIT_VARIABLES= """
+    // global holding view direction in local coordinates
+    vec3 view_ray;
 
-// Moving box filter variables
-uniform int u_filter_size;
-uniform float u_filter_coeff;
-uniform int u_filter_arm;
-uniform int u_filter_type;
-
-uniform int u_use_gaussian_filter;
-uniform int u_gaussian_filter_size;
-
-//uniform int u_log_scale;
-
-// Volume Stats
-//uniform float u_volume_mean;
-//uniform float u_volume_std;
-//uniform float u_volume_madfm;
-uniform float u_high_discard_filter_value;
-uniform float u_low_discard_filter_value;
-uniform float u_density_factor;
-
-uniform int u_color_method;
-
-//varyings
-// varying vec3 v_texcoord;
-varying vec3 v_position;
-varying vec4 v_nearpos;
-varying vec4 v_farpos;
-
-// uniforms for lighting. Hard coded until we figure out how to do lights
-const vec4 u_ambient = vec4(0.2, 0.4, 0.2, 1.0);
-const vec4 u_diffuse = vec4(0.8, 0.2, 0.2, 1.0);
-const vec4 u_specular = vec4(1.0, 1.0, 1.0, 1.0);
-const float u_shininess = 40.0;
-
-//varying vec3 lightDirs[1];
-
-// global holding view direction in local coordinates
-vec3 view_ray;
-
-float rand(vec2 co)
-{{
-    // Create a pseudo-random number between 0 and 1.
-    // http://stackoverflow.com/questions/4200224
-    return fract(sin(dot(co.xy ,vec2(12.9898, 78.233))) * 43758.5453);
-}}
-
-float colorToVal(vec4 color1)
-{{
-    return color1.g;
-}}
-
-vec4 movingAverageFilter_line_of_sight(vec3 loc, vec3 step)
-{{
-    // Initialise variables
-    vec4 partial_color = vec4(0.0, 0.0, 0.0, 0.0);
-
-    for ( int i=1; i<=u_filter_arm; i++ )
-    {{
-        partial_color += $sample(u_volumetex, loc-i*step);
-        partial_color += $sample(u_volumetex, loc+i*step);
-    }}
-
-    partial_color += $sample(u_volumetex, loc);
-
-    // Evaluate mean
-    partial_color *= u_filter_coeff;
-
-    return partial_color;
-}}
-
-vec4 Gaussian_5(vec4 color_original, vec3 loc, vec3 direction) {{
-  vec4 color = vec4(0.0);
-  vec3 off1 = 1.3333333333333333 * direction;
-  color += color_original * 0.29411764705882354;
-  color += $sample(u_volumetex, loc + (off1 * u_resolution)) * 0.35294117647058826;
-  color += $sample(u_volumetex, loc - (off1 * u_resolution)) * 0.35294117647058826;
-  return color;
-}}
-
-vec4 Gaussian_9(vec4 color_original, vec3 loc, vec3 direction)
-{{
-    vec4 color = vec4(0.0);
-    vec3 off1 = 1.3846153846 * direction;
-    vec3 off2 = 3.2307692308 * direction;
-    color += color_original * 0.2270270270;
-    color += $sample(u_volumetex, loc + (off1 * u_resolution)) * 0.3162162162;
-    color += $sample(u_volumetex, loc - (off1 * u_resolution)) * 0.3162162162;
-    color += $sample(u_volumetex, loc + (off2 * u_resolution)) * 0.0702702703;
-    color += $sample(u_volumetex, loc - (off2 * u_resolution)) * 0.0702702703;
-    return color;
-}}
-
-vec4 Gaussian_13(vec4 color_original, vec3 loc, vec3 direction) {{
-  vec4 color = vec4(0.0);
-  vec3 off1 = 1.411764705882353 * direction;
-  vec3 off2 = 3.2941176470588234 * direction;
-  vec3 off3 = 5.176470588235294 * direction;
-  color += color_original * 0.1964825501511404;
-  color += $sample(u_volumetex, loc + (off1 * u_resolution)) * 0.2969069646728344;
-  color += $sample(u_volumetex, loc - (off1 * u_resolution)) * 0.2969069646728344;
-  color += $sample(u_volumetex, loc + (off2 * u_resolution)) * 0.09447039785044732;
-  color += $sample(u_volumetex, loc - (off2 * u_resolution)) * 0.09447039785044732;
-  color += $sample(u_volumetex, loc + (off3 * u_resolution)) * 0.010381362401148057;
-  color += $sample(u_volumetex, loc - (off3 * u_resolution)) * 0.010381362401148057;
-  return color;
-}}
-
-// ----------------------------------------------------------------
-// ----------------------------------------------------------------
-// Edge detection Pass
-// (adapted from https://www.shadertoy.com/view/MscSzf#)
-// ----------------------------------------------------------------
-float checkSame(vec4 center, vec4 sample, vec3 resolution) {{
-    vec2 centerNormal = center.xy;
-    float centerDepth = center.z;
-    vec2 sampleNormal = sample.xy;
-    float sampleDepth = sample.z;
-
-    vec2 sensitivity = (vec2(0.3, 1.5) * resolution.y / 50.0);
-
-    vec2 diffNormal = abs(centerNormal - sampleNormal) * sensitivity.x;
-    bool isSameNormal = (diffNormal.x + diffNormal.y) < 0.1;
-    float diffDepth = abs(centerDepth - sampleDepth) * sensitivity.y;
-    bool isSameDepth = diffDepth < 0.1;
-
-    return (isSameNormal && isSameDepth) ? 1.0 : 0.0;
-}}
-
-vec4 edge_detection(vec4 color_original, vec3 loc, vec3 step, vec3 resolution) {{
-
-    vec4 sample1 = $sample(u_volumetex, loc + (vec3(1., 1., 0.) / resolution));
-    vec4 sample2 = $sample(u_volumetex, loc + (vec3(-1., -1., 0.) / resolution));
-    vec4 sample3 = $sample(u_volumetex, loc + (vec3(-1., 1., 0.) / resolution));
-    vec4 sample4 = $sample(u_volumetex, loc + (vec3(1., -1., 0.) / resolution));
-
-    float edge = checkSame(sample1, sample2, resolution) *
-                 checkSame(sample3, sample4, resolution);
-
-    return vec4(color_original.rgb, 1-edge);
-}}
-// ----------------------------------------------------------------
-// ----------------------------------------------------------------
-
-// Used with iso surface
-vec4 calculateColor(vec4 betterColor, vec3 loc, vec3 step)
-{{
-    // Calculate color by incorporating lighting
-    vec4 color1;
-    vec4 color2;
-
-    // View direction
-    vec3 V = normalize(view_ray);
-
-    // calculate normal vector from gradient
-    vec3 N; // normal
-    color1 = $sample( u_volumetex, loc+vec3(-step[0],0.0,0.0) );
-    color2 = $sample( u_volumetex, loc+vec3(step[0],0.0,0.0) );
-    N[0] = colorToVal(color1) - colorToVal(color2);
-    betterColor = max(max(color1, color2),betterColor);
-    color1 = $sample( u_volumetex, loc+vec3(0.0,-step[1],0.0) );
-    color2 = $sample( u_volumetex, loc+vec3(0.0,step[1],0.0) );
-    N[1] = colorToVal(color1) - colorToVal(color2);
-    betterColor = max(max(color1, color2),betterColor);
-    color1 = $sample( u_volumetex, loc+vec3(0.0,0.0,-step[2]) );
-    color2 = $sample( u_volumetex, loc+vec3(0.0,0.0,step[2]) );
-    N[2] = colorToVal(color1) - colorToVal(color2);
-    betterColor = max(max(color1, color2),betterColor);
-    float gm = length(N); // gradient magnitude
-    N = normalize(N);
-
-    // Flip normal so it points towards viewer
-    float Nselect = float(dot(N,V) > 0.0);
-    N = (2.0*Nselect - 1.0) * N;  // ==  Nselect * N - (1.0-Nselect)*N;
-
-    // Get color of the texture (albeido)
-    color1 = betterColor;
-    color2 = color1;
-    // todo: parametrise color1_to_color2
-
-    // Init colors
-    vec4 ambient_color = vec4(0.0, 0.0, 0.0, 0.0);
-    vec4 diffuse_color = vec4(0.0, 0.0, 0.0, 0.0);
-    vec4 specular_color = vec4(0.0, 0.0, 0.0, 0.0);
-    vec4 final_color;
-
-    // todo: allow multiple light, define lights on viewvox or subscene
-    int nlights = 1;
-    for (int i=0; i<nlights; i++)
-    {{
-        // Get light direction (make sure to prevent zero devision)
-        vec3 L = normalize(view_ray);  //lightDirs[i];
-        float lightEnabled = float( length(L) > 0.0 );
-        L = normalize(L+(1.0-lightEnabled));
-
-        // Calculate lighting properties
-        float lambertTerm = clamp( dot(N,L), 0.0, 1.0 );
-        vec3 H = normalize(L+V); // Halfway vector
-        float specularTerm = pow( max(dot(H,N),0.0), u_shininess);
-
-        // Calculate mask
-        float mask1 = lightEnabled;
-
-        // Calculate colors
-        ambient_color +=  mask1 * u_ambient;  // * gl_LightSource[i].ambient;
-        diffuse_color +=  mask1 * lambertTerm;
-        specular_color += mask1 * specularTerm * u_specular;
-    }}
-
-    // Calculate final color by componing different components
-    final_color = color2 * ( ambient_color + diffuse_color) + specular_color;
-    final_color.a = color2.a;
-
-    // Done
-    return final_color;
-}}
-
-// for some reason, this has to be the last function in order for the
-// filters to be inserted in the correct place...
-
-void main() {{
+    float discard_ratio = 1.0 / (u_high_discard_filter_value - u_low_discard_filter_value);
+    float low_discard_ratio = 1.0 / u_low_discard_filter_value;
+    
+    float val;
+    vec4 color;
+    vec4 temp_color;
+    vec3 direction;
+"""
+FRAG_INIT_RAY = """
     vec3 farpos = v_farpos.xyz / v_farpos.w;
     vec3 nearpos = v_nearpos.xyz / v_nearpos.w;
 
@@ -340,99 +170,242 @@ void main() {{
     // Get starting location and step vector in texture coordinates
     vec3 step = ((v_position - front) / u_shape) / nsteps;
     vec3 start_loc = front / u_shape;
+"""
+SMOOTHING_KERNELS = """
+    vec4 movingAverageFilter_line_of_sight(vec3 loc, vec3 step)
+    {
+        // Initialise variables
+        vec4 partial_color = vec4(0.0, 0.0, 0.0, 0.0);
 
-    // For testing: show the number of steps. This helps to establish
-    // whether the rays are correctly oriented
-    //gl_FragColor = vec4(0.0, nsteps / 3.0 / u_shape.x, 1.0, 1.0);
-    //return;
+        for ( int i=1; i<=u_filter_arm; i++ )
+        {
+            partial_color += $sample(u_volumetex, loc-i*step);
+            partial_color += $sample(u_volumetex, loc+i*step);
+        }
 
-    {before_loop}
+        partial_color += $sample(u_volumetex, loc);
 
-    vec3 loc = start_loc;
-    int iter = 0;
+        // Evaluate mean
+        partial_color *= u_filter_coeff;
 
+        return partial_color;
+    }
 
-    float discard_ratio = 1.0 / (u_high_discard_filter_value - u_low_discard_filter_value);
-    float low_discard_ratio = 1.0 / u_low_discard_filter_value;
+    vec4 Gaussian_5(vec4 color_original, vec3 loc, vec3 direction) {
+      vec4 color = vec4(0.0);
+      vec3 off1 = 1.3333333333333333 * direction;
+      color += color_original * 0.29411764705882354;
+      color += $sample(u_volumetex, loc + (off1 * u_resolution)) * 0.35294117647058826;
+      color += $sample(u_volumetex, loc - (off1 * u_resolution)) * 0.35294117647058826;
+      return color;
+    }
 
+    vec4 Gaussian_9(vec4 color_original, vec3 loc, vec3 direction)
+    {
+        vec4 color = vec4(0.0);
+        vec3 off1 = 1.3846153846 * direction;
+        vec3 off2 = 3.2307692308 * direction;
+        color += color_original * 0.2270270270;
+        color += $sample(u_volumetex, loc + (off1 * u_resolution)) * 0.3162162162;
+        color += $sample(u_volumetex, loc - (off1 * u_resolution)) * 0.3162162162;
+        color += $sample(u_volumetex, loc + (off2 * u_resolution)) * 0.0702702703;
+        color += $sample(u_volumetex, loc - (off2 * u_resolution)) * 0.0702702703;
+        return color;
+    }
 
-    for (iter=0; iter<nsteps; iter++)
-    {{
-        // Get sample color
-        vec4 color;
+    vec4 Gaussian_13(vec4 color_original, vec3 loc, vec3 direction) {
+      vec4 color = vec4(0.0);
+      vec3 off1 = 1.411764705882353 * direction;
+      vec3 off2 = 3.2941176470588234 * direction;
+      vec3 off3 = 5.176470588235294 * direction;
+      color += color_original * 0.1964825501511404;
+      color += $sample(u_volumetex, loc + (off1 * u_resolution)) * 0.2969069646728344;
+      color += $sample(u_volumetex, loc - (off1 * u_resolution)) * 0.2969069646728344;
+      color += $sample(u_volumetex, loc + (off2 * u_resolution)) * 0.09447039785044732;
+      color += $sample(u_volumetex, loc - (off2 * u_resolution)) * 0.09447039785044732;
+      color += $sample(u_volumetex, loc + (off3 * u_resolution)) * 0.010381362401148057;
+      color += $sample(u_volumetex, loc - (off3 * u_resolution)) * 0.010381362401148057;
+      return color;
+    }
+"""
+EDGE_DETECTION_KERNEL = """
+    // Edge detection Pass
+    // (adapted from https://www.shadertoy.com/view/MscSzf#)
 
-        if (u_filter_size == 1)
-            color = $sample(u_volumetex, loc);
-        else {{
-            color = movingAverageFilter_line_of_sight(loc, step);
-        }}
+    float checkSame(vec4 center, vec4 sample, vec3 resolution) {
+        vec2 centerNormal = center.xy;
+        float centerDepth = center.z;
+        vec2 sampleNormal = sample.xy;
+        float sampleDepth = sample.z;
 
-        if (u_use_gaussian_filter==1) {{
-            vec4 temp_color;
-            vec3 direction;
-            if (u_gaussian_filter_size == 5){{
+        vec2 sensitivity = (vec2(0.3, 1.5) * resolution.y / 50.0);
+
+        vec2 diffNormal = abs(centerNormal - sampleNormal) * sensitivity.x;
+        bool isSameNormal = (diffNormal.x + diffNormal.y) < 0.1;
+        float diffDepth = abs(centerDepth - sampleDepth) * sensitivity.y;
+        bool isSameDepth = diffDepth < 0.1;
+
+        return (isSameNormal && isSameDepth) ? 1.0 : 0.0;
+    }
+
+    vec4 edge_detection(vec4 color_original, vec3 loc, vec3 step, vec3 resolution) {
+
+        vec4 sample1 = $sample(u_volumetex, loc + (vec3(1., 1., 0.) / resolution));
+        vec4 sample2 = $sample(u_volumetex, loc + (vec3(-1., -1., 0.) / resolution));
+        vec4 sample3 = $sample(u_volumetex, loc + (vec3(-1., 1., 0.) / resolution));
+        vec4 sample4 = $sample(u_volumetex, loc + (vec3(1., -1., 0.) / resolution));
+
+        float edge = checkSame(sample1, sample2, resolution) *
+                     checkSame(sample3, sample4, resolution);
+
+        return vec4(color_original.rgb, 1-edge);
+    }
+"""
+CALCULATE_COLOR_KERNEL = """
+    float colorToVal(vec4 color)
+    {
+        return color.g;
+    }
+
+    float rand(vec2 co)
+    {
+        // Create a pseudo-random number between 0 and 1.
+        // http://stackoverflow.com/questions/4200224
+        return fract(sin(dot(co.xy ,vec2(12.9898, 78.233))) * 43758.5453);
+    }
+
+    // Used with iso surface
+    vec4 calculateColor(vec4 betterColor, vec3 loc, vec3 step)
+    {   
+        // Calculate color by incorporating lighting
+        vec4 color1;
+        vec4 color2;
+
+        // View direction
+        vec3 V = normalize(view_ray);
+
+        // calculate normal vector from gradient
+        vec3 N; // normal
+        color1 = $sample( u_volumetex, loc+vec3(-step[0],0.0,0.0) );
+        color2 = $sample( u_volumetex, loc+vec3(step[0],0.0,0.0) );
+        N[0] = colorToVal(color1) - colorToVal(color2);
+        betterColor = max(max(color1, color2),betterColor);
+        color1 = $sample( u_volumetex, loc+vec3(0.0,-step[1],0.0) );
+        color2 = $sample( u_volumetex, loc+vec3(0.0,step[1],0.0) );
+        N[1] = colorToVal(color1) - colorToVal(color2);
+        betterColor = max(max(color1, color2),betterColor);
+        color1 = $sample( u_volumetex, loc+vec3(0.0,0.0,-step[2]) );
+        color2 = $sample( u_volumetex, loc+vec3(0.0,0.0,step[2]) );
+        N[2] = colorToVal(color1) - colorToVal(color2);
+        betterColor = max(max(color1, color2),betterColor);
+        float gm = length(N); // gradient magnitude
+        N = normalize(N);
+
+        // Flip normal so it points towards viewer
+        float Nselect = float(dot(N,V) > 0.0);
+        N = (2.0*Nselect - 1.0) * N;  // ==  Nselect * N - (1.0-Nselect)*N;
+
+        // Get color of the texture (albeido)
+        color1 = betterColor;
+        color2 = color1;
+        // todo: parametrise color1_to_color2
+
+        // Init colors
+        vec4 ambient_color = vec4(0.0, 0.0, 0.0, 0.0);
+        vec4 diffuse_color = vec4(0.0, 0.0, 0.0, 0.0);
+        vec4 specular_color = vec4(0.0, 0.0, 0.0, 0.0);
+        vec4 final_color;
+
+        // todo: allow multiple light, define lights on viewvox or subscene
+        int nlights = 1; 
+        for (int i=0; i<nlights; i++)
+        { 
+            // Get light direction (make sure to prevent zero devision)
+            vec3 L = normalize(view_ray);  //lightDirs[i]; 
+            float lightEnabled = float( length(L) > 0.0 );
+            L = normalize(L+(1.0-lightEnabled));
+
+            // Calculate lighting properties
+            float lambertTerm = clamp( dot(N,L), 0.0, 1.0 );
+            vec3 H = normalize(L+V); // Halfway vector
+            float specularTerm = pow( max(dot(H,N),0.0), u_shininess);
+
+            // Calculate mask
+            float mask1 = lightEnabled;
+
+            // Calculate colors
+            ambient_color +=  mask1 * u_ambient;  // * gl_LightSource[i].ambient;
+            diffuse_color +=  mask1 * lambertTerm;
+            specular_color += mask1 * specularTerm * u_specular;
+        }
+
+        // Calculate final color by componing different components
+        final_color = color2 * ( ambient_color + diffuse_color) + specular_color;
+        final_color.a = color2.a;
+
+        // Done
+        return final_color;
+    }
+"""
+SMOOTH_VALUE = """
+            if (u_gaussian_filter_size == 5){
                 // horizontal
                 direction = vec3(1., 0., 0.);
                 temp_color = Gaussian_5(color, loc, direction);
-
+            
                 // vertical
                 direction = vec3(0., 1., 0.);
                 temp_color = Gaussian_5(temp_color, loc, direction);
-
+            
                 // depth
                 direction = vec3(0., 0., 1.);
                 temp_color = Gaussian_5(temp_color, loc, direction);
-            }}
-
-            if (u_gaussian_filter_size == 9){{
+            }
+            
+            if (u_gaussian_filter_size == 9){
                 // horizontal
                 direction = vec3(1., 0., 0.);
                 temp_color = Gaussian_9(color, loc, direction);
-
+            
                 // vertical
                 direction = vec3(0., 1., 0.);
                 temp_color = Gaussian_9(temp_color, loc, direction);
-
+            
                 // depth
                 direction = vec3(0., 0., 1.);
                 temp_color = Gaussian_9(temp_color, loc, direction);
-            }}
-
-            if (u_gaussian_filter_size == 13){{
+            }
+            
+            if (u_gaussian_filter_size == 13){
                 // horizontal
                 direction = vec3(1., 0., 0.);
                 temp_color = Gaussian_13(color, loc, direction);
-
+            
                 // vertical
                 direction = vec3(0., 1., 0.);
                 temp_color = Gaussian_13(temp_color, loc, direction);
-
+            
                 // depth
                 direction = vec3(0., 0., 1.);
                 temp_color = Gaussian_13(temp_color, loc, direction);
-            }}
+            }
             color = temp_color;
-        }}
-
-        float val = color.g;
-
-        // To force activating the uniform - this should be done differently
-        float density_factor = u_density_factor;
-
+"""
+FILTER_VALUE = """
         if (u_filter_type == 1) {{
             // Get rid of very strong signal values
             if (val > u_high_discard_filter_value)
             {{
                 val = 0.;
             }}
-
+        
             // Don't consider noisy values
             //if (val < u_volume_mean - 3*u_volume_std)
             if (val < u_low_discard_filter_value)
             {{
                 val = 0.;
             }}
-
+        
             if (u_low_discard_filter_value == u_high_discard_filter_value)
             {{
                 if (u_low_discard_filter_value != 0.)
@@ -450,51 +423,100 @@ void main() {{
             {{
                 val = 0.;
             }}
-
+        
             if (val < u_low_discard_filter_value)
             {{
                 val = 0.;
             }}
         }}
+"""
 
+FRAG_GENERAL_SECTIONS = dict(
+    frag_init_uniforms=FRAG_INIT_UNIFORMS,
+    frag_init_varyings=FRAG_INIT_VARYINGS,
+    frag_init_consts=FRAG_INIT_CONSTS,
+    frag_init_variables=FRAG_INIT_VARIABLES,
+    smoothing_kernels=SMOOTHING_KERNELS,
+    edge_detection_kernel=EDGE_DETECTION_KERNEL,
+    calculate_color_kernel=CALCULATE_COLOR_KERNEL,
+    frag_init_ray=FRAG_INIT_RAY,
+    smooth_value=SMOOTH_VALUE,
+    filter_value=FILTER_VALUE,
+    before_loop="<(tf_before_loop)>",
+    in_loop="<(tf_in_loop)>",
+    after_loop="<(tf_after_loop)>",
+)
+
+# FRAGMENT SHADER
+FRAG_SHADER = """
+{frag_init_uniforms}
+{frag_init_varyings}
+{frag_init_consts}
+{frag_init_variables}
+
+{smoothing_kernels}
+{calculate_color_kernel}
+
+void main() {{
+    
+    {frag_init_ray}
+    
+    {before_loop}
+    
+    vec3 loc = start_loc;    
+    
+    for (int iter=0; iter<nsteps; iter++)
+    {{
+        color = $sample(u_volumetex, loc);
+        /*
+        // Get sample color
+        if (u_filter_size == 1)
+            color = $sample(u_volumetex, loc);
+        else {{
+            color = movingAverageFilter_line_of_sight(loc, step);
+        }}
+
+        if (u_use_gaussian_filter==1) {{
+            {smooth_value}
+        }}
+        */
+
+        val = color.g;
+        /*
+        {filter_value}
+        */
         {in_loop}
-
+        
         // Advance location deeper into the volume
         loc += step;
     }}
 
+    /*
     {after_loop}
-
-    //gl_FragColor = edge_detection(gl_FragColor, loc, step, u_shape);
-
-    /* Set depth value - from visvis TODO
-    int iter_depth = int(maxi);
-    // Calculate end position in world coordinates
-    vec4 position2 = vertexPosition;
-    position2.xyz += ray*shape*float(iter_depth);
-    // Project to device coordinates and set fragment depth
-    vec4 iproj = gl_ModelViewProjectionMatrix * position2;
-    iproj.z /= iproj.w;
-    gl_FragDepth = (iproj.z+1.0)/2.0;
     */
+    
+    gl_FragColor = $cmap(maxval);
+    
+    //gl_FragColor = color;
 }}
 
+""".format(**FRAG_GENERAL_SECTIONS)  # noqa
+# Add curly brackets back to be able to use .format by transfer functions (tf_)
+FRAG_SHADER = FRAG_SHADER.replace("{", "{{").replace("}", "}}").replace("<(", "{").replace(")>", "}")
 
-"""  # noqa
-
-
+# TRANSFER FUNCTIONS
 MIP_SNIPPETS = dict(
-    before_loop="""
+    tf_before_loop="""
         float maxval = -99999.0; // The maximum encountered value
         int maxi = 0;  // Where the maximum value was encountered
         """,
-    in_loop="""
+    tf_in_loop="""
         if( val > maxval ) {
             maxval = val;
             maxi = iter;
         }
         """,
-    after_loop="""
+    tf_after_loop="""
         // Refine search for max value
         loc = start_loc + step * (float(maxi) - 0.5);
 
@@ -519,7 +541,7 @@ MIP_SNIPPETS = dict(
                 gl_FragColor = $cmap(loc.y);
 
                 //if (maxval == 0)
-                    gl_FragColor.a = maxval;
+                gl_FragColor.a = maxval;
             }
             // Color is associated to RGB cube
             else {
@@ -543,14 +565,14 @@ MIP_FRAG_SHADER = FRAG_SHADER.format(**MIP_SNIPPETS)
 
 
 LMIP_SNIPPETS = dict(
-    before_loop="""
+    tf_before_loop="""
         float maxval = -99999.0; // The maximum encountered value
         float local_maxval = -99999.0; // The local maximum encountered value
         int maxi = 0;  // Where the maximum value was encountered
         int local_maxi = 0;  // Where the local maximum value was encountered
         bool local_max_found = false;
         """,
-    in_loop="""
+    tf_in_loop="""
         if( val > u_threshold && !local_max_found ) {
             local_maxval = val;
             local_maxi = iter;
@@ -562,7 +584,7 @@ LMIP_SNIPPETS = dict(
             maxi = iter;
         }
         """,
-    after_loop="""
+    tf_after_loop="""
         if (!local_max_found) {
             local_maxval = maxval;
             local_maxi = maxi;
@@ -599,7 +621,7 @@ LMIP_FRAG_SHADER = FRAG_SHADER.format(**LMIP_SNIPPETS)
 
 
 TRANSLUCENT_SNIPPETS = dict(
-    before_loop="""
+    tf_before_loop="""
         vec4 integrated_color = vec4(0., 0., 0., 0.);
         float mom0 = 0.;
         float mom1 = 0.;
@@ -607,13 +629,13 @@ TRANSLUCENT_SNIPPETS = dict(
         float a1 = 0.;
         float a2 = 0.;
         """,
-    in_loop="""
+    tf_in_loop="""
             float alpha;
             // Case 1: Color is associated to voxel intensity
             if (u_color_method == 0) {
                 /*color = $cmap(val);
                 a1 = integrated_color.a;
-                a2 = val * density_factor * (1 - a1);
+                a2 = val * u_density_factor * (1 - a1);
 
                 alpha = max(a1 + a2, 0.001);
 
@@ -623,7 +645,7 @@ TRANSLUCENT_SNIPPETS = dict(
                 color = $cmap(val);
 
                 a1 = integrated_color.a;
-                a2 = val * density_factor * (1 - a1);
+                a2 = val * u_density_factor * (1 - a1);
 
                 alpha = max(a1 + a2, 0.001);
 
@@ -636,7 +658,7 @@ TRANSLUCENT_SNIPPETS = dict(
                 if (u_color_method == 1) {
                     color = $cmap(loc.y);
                     a1 = integrated_color.a;
-                    a2 = val * density_factor * (1 - a1);
+                    a2 = val * u_density_factor * (1 - a1);
 
                     alpha = max(a1 + a2, 0.001);
 
@@ -650,7 +672,7 @@ TRANSLUCENT_SNIPPETS = dict(
                         color.g = loc.z;
                         color.b = loc.x;
                         a1 = integrated_color.a;
-                        a2 = val * density_factor * (1 - a1);
+                        a2 = val * u_density_factor * (1 - a1);
 
                         alpha = max(a1 + a2, 0.001);
 
@@ -662,7 +684,7 @@ TRANSLUCENT_SNIPPETS = dict(
                     else {
                         // mom0
                         a1 = mom0;
-                        a2 = val * density_factor * (1 - a1);
+                        a2 = val * u_density_factor * (1 - a1);
 
                         alpha = max(a1 + a2, 0.001);
 
@@ -671,7 +693,7 @@ TRANSLUCENT_SNIPPETS = dict(
 
                         // mom1
                         a1 = mom1;
-                        a2 = val * density_factor * (1 - a1);
+                        a2 = val * u_density_factor * (1 - a1);
 
                         alpha = max(a1 + a2, 0.001);
 
@@ -689,7 +711,7 @@ TRANSLUCENT_SNIPPETS = dict(
             }
 
         """,
-    after_loop="""
+    tf_after_loop="""
 
         if (u_color_method != 3){
             gl_FragColor = integrated_color;
@@ -701,17 +723,18 @@ TRANSLUCENT_SNIPPETS = dict(
 )
 TRANSLUCENT_FRAG_SHADER = FRAG_SHADER.format(**TRANSLUCENT_SNIPPETS)
 
+
 TRANSLUCENT2_SNIPPETS = dict(
-    before_loop="""
+    tf_before_loop="""
         vec4 integrated_color = vec4(0., 0., 0., 0.);
         float ratio = 1/nsteps; // final average
         """,
-    in_loop="""
+    tf_in_loop="""
             float alpha;
             // Case 1: Color is associated to voxel intensity
             if (u_color_method == 0) {
                 color = $cmap(val);
-                integrated_color = (val * density_factor + integrated_color.a * (1 - density_factor)) * color;
+                integrated_color = (val * u_density_factor + integrated_color.a * (1 - u_density_factor)) * color;
                 alpha = integrated_color.a;
 
                 //alpha = a1+a2;
@@ -723,7 +746,7 @@ TRANSLUCENT2_SNIPPETS = dict(
                 if (u_color_method == 1) {
                     color = $cmap(loc.y);
                     float a1 = integrated_color.a;
-                    float a2 = val * density_factor * (1 - a1);
+                    float a2 = val * u_density_factor * (1 - a1);
 
                     alpha = max(a1 + a2, 0.001);
 
@@ -736,7 +759,7 @@ TRANSLUCENT2_SNIPPETS = dict(
                     color.g = loc.z;
                     color.b = loc.y;
                     float a1 = integrated_color.a;
-                    float a2 = val * density_factor * (1 - a1);
+                    float a2 = val * u_density_factor * (1 - a1);
 
                     alpha = max(a1 + a2, 0.001);
 
@@ -753,24 +776,23 @@ TRANSLUCENT2_SNIPPETS = dict(
             }
 
         """,
-    after_loop="""
+    tf_after_loop="""
         gl_FragColor = integrated_color;
         """,
 )
 TRANSLUCENT2_FRAG_SHADER = FRAG_SHADER.format(**TRANSLUCENT2_SNIPPETS)
 
 
-
 ADDITIVE_SNIPPETS = dict(
-    before_loop="""
+    tf_before_loop="""
         vec4 integrated_color = vec4(0., 0., 0., 0.);
         """,
-    in_loop="""
+    tf_in_loop="""
         color = $cmap(val);
 
         integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - color);
         """,
-    after_loop="""
+    tf_after_loop="""
         gl_FragColor = integrated_color;
         """,
 )
@@ -778,12 +800,12 @@ ADDITIVE_FRAG_SHADER = FRAG_SHADER.format(**ADDITIVE_SNIPPETS)
 
 
 ISO_SNIPPETS = dict(
-    before_loop="""
+    tf_before_loop="""
         vec4 color3 = vec4(0.0);  // final color
         vec3 dstep = 1.5 / u_shape;  // step to sample derivative
         gl_FragColor = vec4(0.0);
     """,
-    in_loop="""
+    tf_in_loop="""
         if (val > u_threshold-0.2) {
             // Take the last interval in smaller steps
             vec3 iloc = loc - step;
@@ -799,11 +821,12 @@ ISO_SNIPPETS = dict(
             }
         }
         """,
-    after_loop="""
+    tf_after_loop="""
         """,
+    smoothing_kernels=SMOOTHING_KERNELS
 )
-
 ISO_FRAG_SHADER = FRAG_SHADER.format(**ISO_SNIPPETS)
+
 
 frag_dict = {
     'mip': MIP_FRAG_SHADER,
@@ -931,9 +954,6 @@ class RenderVolumeVisual(Visual):
         self._tex = tex_cls((10, 10, 10), interpolation=interpolation,
                             wrapping='clamp_to_edge')
 
-        # self._tex = tex_cls((10, 10, 10), interpolation='linear',
-        #                     wrapping='clamp_to_edge')
-
         # Create program
         Visual.__init__(self, vcode=VERT_SHADER, fcode="")
         self.shared_program['u_volumetex'] = self._tex
@@ -953,13 +973,12 @@ class RenderVolumeVisual(Visual):
         # Set params
         self.method = method
         self.relative_step_size = relative_step_size
-        #self.color_scale = color_scale
-        # self.data_min = self._clim[0]
-        # self.data_max = self._clim[1]
+        self.threshold = threshold if (threshold is not None) else vol.mean()
 
         # moving_box_filter (=1 means no filter)
         self.filter_type = filter_type
         self.filter_size = filter_size
+
         # 3D gaussian filter
         self.use_gaussian_filter = use_gaussian_filter
         self.gaussian_filter_size = gaussian_filter_size
@@ -967,8 +986,6 @@ class RenderVolumeVisual(Visual):
         self.density_factor = density_factor
         self.color_method = color_method
 
-        self.threshold = threshold if (threshold is not None) else vol.mean()
-        # print ("threshold", self.threshold)
         self.freeze()
 
     def set_data(self, vol, clim=None):
@@ -996,8 +1013,12 @@ class RenderVolumeVisual(Visual):
         if self._clim is None:
             self._clim = np.nanmin(vol), np.nanmax(vol)
 
+        # Deal with nan
+        if np.isnan(vol).any():
+            vol = np.nan_to_num(vol)
+
         # Apply clim
-        vol = np.flipud(np.array(vol, dtype='float32', copy=False))
+        vol = np.array(np.flipud(vol), dtype='float32', copy=False)
         if self._clim[1] == self._clim[0]:
             if self._clim[0] != 0.:
                 vol *= 1.0 / self._clim[0]
@@ -1005,12 +1026,9 @@ class RenderVolumeVisual(Visual):
             vol -= self._clim[0]
             vol /= self._clim[1] - self._clim[0]
 
-        # Deal with nan
-        if np.isnan(vol).any():
-            vol = np.nan_to_num(vol)
-
         self.high_discard_filter_value = self._clim[1]
         self.low_discard_filter_value = self._clim[0]
+        self.density_factor = 1
 
         # self.volume_mean = np.mean(vol)
         # self.volume_std = np.std(vol)
@@ -1058,6 +1076,8 @@ class RenderVolumeVisual(Visual):
     @cmap.setter
     def cmap(self, cmap):
         self._cmap = get_colormap(cmap)
+        print ("cmap: ", self._cmap.glsl_map)
+        print ('')
         self.shared_program.frag['cmap'] = Function(self._cmap.glsl_map)
         self.update()
 
@@ -1092,6 +1112,7 @@ class RenderVolumeVisual(Visual):
             self.shared_program['u_threshold'] = None
 
         self.shared_program.frag = frag_dict[method]
+
         self.shared_program.frag['sampler_type'] = self._tex.glsl_sampler_type
         self.shared_program.frag['sample'] = self._tex.glsl_sample
         self.shared_program.frag['cmap'] = Function(self._cmap.glsl_map)
@@ -1312,7 +1333,7 @@ class RenderVolumeVisual(Visual):
         return self._density_factor
 
     @density_factor.setter
-    def density_factor(self, density_factor):
+    def density_factor(self, density_factor=1):
         self._density_factor = float(density_factor)
 
         self.shared_program['u_density_factor'] = self._density_factor
@@ -1325,7 +1346,7 @@ class RenderVolumeVisual(Visual):
         
         Larger values yield higher performance at reduced quality. If
         set > 2.0 the ray skips entire voxels. Recommended values are
-        between 0.5 and 1.5. The amount of quality degradation depends
+        between 0.5 and 1.5. The amount of quality degredation depends
         on the render method.
         """
         return self._relative_step_size
@@ -1403,6 +1424,3 @@ class RenderVolumeVisual(Visual):
         return np.median(volume - np.median(volume)) * 1.4826042
 
 RenderVolume = create_visual_node(RenderVolumeVisual)
-
-def get_interpolation_fun():
-    return get_interpolation_fun()
