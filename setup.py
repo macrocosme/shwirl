@@ -7,18 +7,8 @@ from os import path
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
-# with open(path.join(here, 'README.md'), encoding='utf-8') as f:
-#     long_description = f.read()
-
-package_data = {'.images': ['*.png']}
-
-for subpackage in ['antialias', 'arrowheads', 'arrows', 'collections',
-                   'colormaps', 'lines', 'markers', 'math', 'misc',
-                   'transforms']:
-    package_data['.extern.vispy.glsl.' + subpackage] = ['*.vert','*.frag', "*.glsl"]
-
-for subpackage in ['.extern.vispy.io._data']:
-    package_data[subpackage] = ['*.npy', '*.*']
+with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(
     name='shwirl',
@@ -26,7 +16,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1.11',
+    version='0.2.0',
 
     description='Meaningful colouring of spectral cube data with volume rendering',
     # long_description=long_description,
@@ -76,27 +66,7 @@ setup(
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
-    packages=['shwirl.images', 'shwirl.extern', 'shwirl.extern.vispy', 'shwirl.extern.vispy.io', 'shwirl.extern.vispy.io.tests',
-              'shwirl.extern.vispy.io._data', 'shwirl.extern.vispy.app',
-              'shwirl.extern.vispy.app.tests', 'shwirl.extern.vispy.app.backends', 'shwirl.extern.vispy.app.backends.tests',
-              'shwirl.extern.vispy.app.backends.ipython', 'shwirl.extern.vispy.ext', 'shwirl.extern.vispy.ext._bundled',
-              'shwirl.extern.vispy.ext._bundled.cassowary', 'shwirl.extern.vispy.gloo', 'shwirl.extern.vispy.gloo.gl',
-              'shwirl.extern.vispy.gloo.gl.tests', 'shwirl.extern.vispy.gloo.tests', 'shwirl.extern.vispy.glsl', 'shwirl.extern.vispy.glsl.math',
-              'shwirl.extern.vispy.glsl.misc', 'shwirl.extern.vispy.glsl.lines', 'shwirl.extern.vispy.glsl.arrows',
-              'shwirl.extern.vispy.glsl.markers', 'shwirl.extern.vispy.glsl.antialias', 'shwirl.extern.vispy.glsl.colormaps',
-              'shwirl.extern.vispy.glsl.arrowheads', 'shwirl.extern.vispy.glsl.transforms', 'shwirl.extern.vispy.glsl.collections',
-              'shwirl.extern.vispy.plot', 'shwirl.extern.vispy.plot.tests', 'shwirl.extern.vispy.util', 'shwirl.extern.vispy.util.dpi',
-              'shwirl.extern.vispy.util.dpi.tests', 'shwirl.extern.vispy.util.svg', 'shwirl.extern.vispy.util.fonts',
-              'shwirl.extern.vispy.util.fonts.tests', 'shwirl.extern.vispy.util.tests', 'shwirl.extern.vispy.color',
-              'shwirl.extern.vispy.color.tests', 'shwirl.extern.vispy.scene', 'shwirl.extern.vispy.scene.tests',
-              'shwirl.extern.vispy.scene.cameras', 'shwirl.extern.vispy.scene.cameras.tests', 'shwirl.extern.vispy.scene.widgets',
-              'shwirl.extern.vispy.ipython', 'shwirl.extern.vispy.testing', 'shwirl.extern.vispy.testing.tests', 'shwirl.extern.vispy.visuals',
-              'shwirl.extern.vispy.visuals.glsl', 'shwirl.extern.vispy.visuals.line', 'shwirl.extern.vispy.visuals.text',
-              'shwirl.extern.vispy.visuals.tests', 'shwirl.extern.vispy.visuals.graphs', 'shwirl.extern.vispy.visuals.graphs.tests',
-              'shwirl.extern.vispy.visuals.graphs.layouts', 'shwirl.extern.vispy.visuals.filters', 'shwirl.extern.vispy.visuals.shaders',
-              'shwirl.extern.vispy.visuals.shaders.tests', 'shwirl.extern.vispy.visuals.transforms',
-              'shwirl.extern.vispy.visuals.transforms.tests', 'shwirl.extern.vispy.visuals.collections', 'shwirl.extern.vispy.geometry',
-              'shwirl.extern.vispy.geometry.tests', 'shwirl.shaders', 'shwirl'],
+    packages=[],
 
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:

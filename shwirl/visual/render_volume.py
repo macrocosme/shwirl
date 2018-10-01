@@ -902,6 +902,7 @@ class RenderVolumeVisual(Visual):
 
         # Set the colormap
         self._cmap = get_colormap(cmap)
+        self._need_colortransform_update = True
 
         # Create gloo objects
         self._vertices = VertexBuffer()
@@ -1076,9 +1077,8 @@ class RenderVolumeVisual(Visual):
     @cmap.setter
     def cmap(self, cmap):
         self._cmap = get_colormap(cmap)
-        print ("cmap: ", self._cmap.glsl_map)
-        print ('')
-        self.shared_program.frag['cmap'] = Function(self._cmap.glsl_map)
+        self._need_colortransform_update = True
+        # self.shared_program.frag['cmap'] = Function(self._cmap.glsl_map)
         self.update()
 
     @property
