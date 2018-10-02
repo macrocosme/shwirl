@@ -61,20 +61,6 @@ class MainWindow(QMainWindow):
         splitter_h = QSplitter(Qt.Horizontal)
         splitter_v = QSplitter(Qt.Vertical)
 
-        self.Canvas3D = Canvas3D(resolution)
-        self.Canvas3D.create_native()
-        self.Canvas3D.native.setParent(self)
-
-        # Histogram
-        # self.Canvas2D = Canvas2D()
-        # #self.Canvas2D.create_native()
-        # self.Canvas2D.native.setParent(self)
-        # splitter_v.addWidget(self.Canvas2D.native)
-
-        # Main Canvas3D for 3D rendering
-        splitter_h.addWidget(self.Canvas3D.native)
-        # splitter_h.addWidget(splitter_v)
-
         # Menus / viz options
         self.widget_types = ['load_button', 'view', 'rendering_params', 'filtering', 'smoothing', 'image']
         self.widget_types_text = {'load_button': 'Import',
@@ -96,9 +82,17 @@ class MainWindow(QMainWindow):
         splitter_v.addWidget(toolbox)
         splitter_h.addWidget(splitter_v)
 
-        splitter_h.setSizes([resolution.height(), int(resolution.width()/5.5)])
-
         self.setCentralWidget(splitter_h)
+
+        self.Canvas3D = Canvas3D(resolution)
+        self.Canvas3D.create_native()
+        self.Canvas3D.native.setParent(self)
+
+        # Main Canvas3D for 3D rendering
+        splitter_h.addWidget(self.Canvas3D.native)
+
+        splitter_h.setSizes([resolution.height(), int((resolution.width() / 3) * 5)])
+
 
         # Connect signals (events handling)
         self.props['load_button'].signal_file_loaded.connect(self.load_volume)
