@@ -1069,7 +1069,7 @@ class Canvas3D(scene.SceneCanvas):
         # print ('window_resolution', self.window_resolution.width(), self.window_resolution.height())
 
         if self.window_resolution.width() <= 3000:
-            CBAR_LONG_DIM = 150
+            self.CBAR_LONG_DIM = 150
             self.cbar.label.font_size = 15
             self.cbar.label.color = "white"
             self.cbar.ticks[0].font_size = 12
@@ -1077,7 +1077,7 @@ class Canvas3D(scene.SceneCanvas):
             self.cbar.ticks[0].color = "white"
             self.cbar.ticks[1].color = "white"
         else:
-            CBAR_LONG_DIM = 300
+            self.CBAR_LONG_DIM = 300
             self.cbar.label.font_size = 60
             self.cbar.label.color = "white"
             self.cbar.ticks[0].font_size = 45
@@ -1092,24 +1092,24 @@ class Canvas3D(scene.SceneCanvas):
             self.grid.remove_widget(self.cbar_bottom)
             self.cbar_bottom = self.grid.add_widget(self.cbar, row=2, col=1)
             self.cbar_bottom.height_max = \
-                self.cbar_bottom.height_max = CBAR_LONG_DIM
+                self.cbar_bottom.height_max = self.CBAR_LONG_DIM
 
         elif self.cbar.orientation == "top":
             self.grid.remove_widget(self.cbar_top)
             self.cbar_top = self.grid.add_widget(self.cbar, row=0, col=1)
-            self.cbar_top.height_max = self.cbar_top.height_max = CBAR_LONG_DIM
+            self.cbar_top.height_max = self.cbar_top.height_max = self.CBAR_LONG_DIM
 
         elif self.cbar.orientation == "left":
             # self.grid.remove_widget(self.cbar_left)
             self.grid.remove_widget(self.cbar)
             self.cbar_left = self.grid.add_widget(self.cbar, row=0, col=0)
-            self.cbar_left.width_max = self.cbar_left.width_min = CBAR_LONG_DIM
+            self.cbar_left.width_max = self.cbar_left.width_min = self.CBAR_LONG_DIM
 
         else:  # self.cbar.orientation == "right"
             self.grid.remove_widget(self.cbar_right)
             self.cbar_right = self.grid.add_widget(self.cbar, row=2, col=2)
             self.cbar_right.width_max = \
-                self.cbar_right.width_min = CBAR_LONG_DIM
+                self.cbar_right.width_min = self.CBAR_LONG_DIM
 
             # return cbar
 
@@ -1310,10 +1310,9 @@ class Canvas3D(scene.SceneCanvas):
                           cmap="hsl",
                           border_width=0,
                           border_color="#404040")
+            self.show_colorbar = True
 
             # self.histogram(data.ravel())
-
-
 
             # self.rotation and self.timer used for autorotate.
             self.rotation = scene.MatrixTransform()
@@ -1439,23 +1438,26 @@ class Canvas3D(scene.SceneCanvas):
         self.volume.color_method = combo_color_method
         self.volume.interpolation = interpolation_method
 
-        # print(self.volume.color_method)
         if (self.volume.color_method == 0):
             label = str(self.bunit)
-            # print("label", label)
             clim = self.volume.clim
+            self.cbar_left.visible = True
+            self.show_colorbar = True
+
+        elif (self.volume.color_method == 2):
+            self.cbar_left.visible = False
+            self.show_colorbar = False
+
         else:
             label = str(self.vel_type)
-            # print("label", label)
             clim = self.clim_vel
+            self.cbar_left.visible = True
+            self.show_colorbar = True
 
-        # print ('clim', clim)
-
-        self.cbar.clim = clim
-        self.cbar.label_str = label
-        self.cbar.cmap = cmap
-
-        # self.volume.set_rendering_params(data, [clim_min, clim_max])
+        if self.show_colorbar:
+            self.cbar.clim = clim
+            self.cbar.label_str = label
+            self.cbar.cmap = cmap
 
     def set_threshold(self, threshold):
         """Set threshold value for the visualised volume.
