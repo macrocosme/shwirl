@@ -460,7 +460,7 @@ class ObjectWidget(QWidget):
         elif type == 'rendering_params':
             l_tf_method = QLabel("Transfer function ")
             # self.l_tf_method = ['mip', 'translucent', 'translucent2', 'iso', 'additive']
-            self.tf_method = ['mip', 'lmip', 'avip', 'iso']
+            self.tf_method = ['mip', 'lmip', 'avip', 'iso', 'minip']
             self.combo_tf_method = QComboBox(self)
             self.combo_tf_method.addItems(self.tf_method)
             self.combo_tf_method.currentIndexChanged.connect(self.update_param)
@@ -531,7 +531,7 @@ class ObjectWidget(QWidget):
             l_filter_size = QLabel("Box size")
             self.slider_filter_size = QSlider(Qt.Horizontal, self)
             self.slider_filter_size.setMinimum(0)
-            self.slider_filter_size.setMaximum(10)
+            self.slider_filter_size.setMaximum(5)
             self.slider_filter_size.setValue(0)
             self.l_filter_size_value = QLineEdit(str(self.slider_filter_size.value() + 1))
             self.slider_filter_size.valueChanged.connect(self.update_filter_size)
@@ -662,17 +662,12 @@ class ObjectWidget(QWidget):
 
         if filename[0] != "":
             # Load file
-            # print(filename)
             self.loaded_cube = fits.open(filename[0])
 
             try:
                 self.vol_min = self.loaded_cube[0].header["DATAMIN"]
                 self.vol_max = self.loaded_cube[0].header["DATAMAX"]
-
-                # print("DATAMIN", self.vol_min)
-                # print("DATAMAX", self.vol_max)
             except:
-                # print("Warning: DATAMIN and DATAMAX not present in header; evaluating min and max")
                 if self.loaded_cube[0].header["NAXIS"] == 3:
                     self.vol_min = np.nanmin(self.loaded_cube[0].data)
                     self.vol_max = np.nanmax(self.loaded_cube[0].data)
@@ -680,17 +675,7 @@ class ObjectWidget(QWidget):
                     self.vol_min = np.nanmin(self.loaded_cube[0].data[0])
                     self.vol_max = np.nanmax(self.loaded_cube[0].data[0])
 
-            # # Will trigger update clim
-            # self.l_clim_min.setText(str(min))
-            # self.l_clim_max.setText(str(max))
-
-            # for widgets in self.widgets_array:
-            #     for widget in widgets:
-            #         widget.setEnabled(True)
-
             self.signal_file_loaded.emit()
-            # self.signal_objet_changed.emit()
-            # self.signal_camera_changed.emit()
 
     def update_discard_filter_text(self, min, max):
         """Update the discard filter text field.
@@ -729,9 +714,6 @@ class ObjectWidget(QWidget):
         else:
             return "{:.4f}".format(value)
 
-    # def update_clim(self):
-    #     self.signal_file_loaded.emit()
-
     def update_view(self):
         """Update view.
 
@@ -754,9 +736,6 @@ class ObjectWidget(QWidget):
         Emits the Qt signal informing that autorotate has changed.
         """
         self.signal_autorotate_changed.emit()
-
-    # def update_log_scale(self):
-    #     self.signal_log_scale_changed.emit()
 
     def update_scaling(self):
         """Update scaling.
@@ -806,15 +785,6 @@ class ObjectWidget(QWidget):
 
         Emits the Qt signal informing that filter type has changed.
         """
-        # if self.combo_filter_type.currentText() == 'Rescale':
-        #     for widget in self.widgets_dict['high_discard_filter']:
-        #         widget.show()
-        # else:
-        #     for widget in self.widgets_dict['high_discard_filter']:
-        #         widget.hide()
-        #
-        #     self.reset_discard_filters_values()
-
         self.signal_filter_type_changed.emit()
 
     def update_gaussian_filter_size(self):
@@ -832,7 +802,6 @@ class ObjectWidget(QWidget):
         Emits the Qt signal informing that high discard filter has changed.
         """
         # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
-
         self.high_scaled_value = self.scale_value(self.slider_high_discard_filter.value(),
                                                   self.slider_high_discard_filter.minimum(),
                                                   self.slider_high_discard_filter.maximum(),
@@ -853,9 +822,7 @@ class ObjectWidget(QWidget):
         Updates the low discard filter text field with the new scaled value.
         Emits the Qt signal informing that low discard filter has changed.
         """
-
         # (log_x - np.min(log_x)) * (nbins / (np.max(log_x) - np.min(log_x)))
-
         self.low_scaled_value = self.scale_value(self.slider_low_discard_filter.value(),
                                                  self.slider_low_discard_filter.minimum(),
                                                  self.slider_low_discard_filter.maximum(),
@@ -1057,7 +1024,6 @@ class Canvas3D(scene.SceneCanvas):
         --------
         ColorBarWidget
         """
-
         self.cbar = scene.ColorBarWidget(orientation=position,
                                          label=label,
                                          cmap=cmap,
@@ -1065,8 +1031,6 @@ class Canvas3D(scene.SceneCanvas):
                                          border_width=border_width,
                                          border_color=border_color,
                                          **kwargs)
-
-        # print ('window_resolution', self.window_resolution.width(), self.window_resolution.height())
 
         if self.window_resolution.width() <= 3000:
             self.CBAR_LONG_DIM = 150
@@ -1089,29 +1053,26 @@ class Canvas3D(scene.SceneCanvas):
         # view - column 2
 
         if self.cbar.orientation == "bottom":
-            self.grid.remove_widget(self.cbar_bottom)
+            self.grid.remove_widget(self.cbar)
             self.cbar_bottom = self.grid.add_widget(self.cbar, row=2, col=1)
             self.cbar_bottom.height_max = \
                 self.cbar_bottom.height_max = self.CBAR_LONG_DIM
 
         elif self.cbar.orientation == "top":
-            self.grid.remove_widget(self.cbar_top)
+            self.grid.remove_widget(self.cbar)
             self.cbar_top = self.grid.add_widget(self.cbar, row=0, col=1)
             self.cbar_top.height_max = self.cbar_top.height_max = self.CBAR_LONG_DIM
 
         elif self.cbar.orientation == "left":
-            # self.grid.remove_widget(self.cbar_left)
             self.grid.remove_widget(self.cbar)
             self.cbar_left = self.grid.add_widget(self.cbar, row=0, col=0)
             self.cbar_left.width_max = self.cbar_left.width_min = self.CBAR_LONG_DIM
 
-        else:  # self.cbar.orientation == "right"
-            self.grid.remove_widget(self.cbar_right)
+        else:
+            self.grid.remove_widget(self.cbar)
             self.cbar_right = self.grid.add_widget(self.cbar, row=2, col=2)
             self.cbar_right.width_max = \
                 self.cbar_right.width_min = self.CBAR_LONG_DIM
-
-            # return cbar
 
     def histogram(self, data, bins=100, color='w', orientation='h'):
         """Calculate and show a histogram of data
@@ -1129,12 +1090,9 @@ class Canvas3D(scene.SceneCanvas):
         """
         self.view_histogram = self.grid.add_view(row=1, col=0, border_color='#404040', bgcolor="#404040")
         self.view_histogram.camera = 'panzoom'
-        # self.camera_histogram = self.view_histogram.camera
-
         self.hist = scene.Histogram(data, bins, color, orientation)
         self.view_histogram.add(self.hist)
         self.view_histogram.camera.set_range()
-        # return self.hist
 
     def set_volume_scene(self, cube):
         """Set volume scene
@@ -1151,14 +1109,13 @@ class Canvas3D(scene.SceneCanvas):
         Move some of the code from this function to atomic functions (e.g. header information for cmap).
 
         """
-        # # Set up a viewbox to display the image with interactive pan/zoom
+        # Set up a viewbox to display the image with interactive pan/zoom
         if self.view:
             canvas = self.central_widget.remove_widget(self.grid)
             self._configure_canvas()
 
         self.unfreeze()
-        self.view = self.grid.add_view(row=0, col=1, #row_span=2,
-                                       border_color='#404040', bgcolor="#404040")
+        self.view = self.grid.add_view(row=0, col=1, border_color='#404040', bgcolor="#404040")
 
         try:
             # Quick fix -- will need to be a bit more clever.
@@ -1184,13 +1141,9 @@ class Canvas3D(scene.SceneCanvas):
 
             # print(cube[0].data.shape)
             if len(cube[0].data.shape) == 4:
-                # Test
-                # cube[0].data = np.swapaxes(cube[0].data, 0, 1)
-
-
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
                 data = cube[0].data[0][:2048, :2048, :2048]
-                # data = cube[0].data[0][75:150, 110:150, 100:150]
+
 
                 self.vel_axis = cube[0].data[0].shape[0]
             else:
