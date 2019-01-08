@@ -9,6 +9,7 @@ import numpy as np
 from .extern.vispy import app, scene, io
 from .extern.vispy.color import get_colormaps
 from .shaders import RenderVolume
+from .shaders.axes import AxesVisual3D
 
 # Astropy imports
 from astropy.io import fits
@@ -1139,6 +1140,8 @@ class Canvas3D(scene.SceneCanvas):
             # except:
             #     self.vel = "unknown"
 
+            self.parse_header_info(cube)
+
             # print(cube[0].data.shape)
             if len(cube[0].data.shape) == 4:
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
@@ -1231,17 +1234,59 @@ class Canvas3D(scene.SceneCanvas):
 
             # Add a mesh to simulate a box around the volume rendering. Acts as 3D axis.
             # Should eventually add measurements taken from fits header (RA, DEC...).
-            vertices, filled_indices, outline_indices = self.create_cube(data.shape)
-            self.axis = scene.visuals.Mesh(vertices['position'],
-                                           outline_indices,
-                                           color="white",
-                                           parent=self.view.scene,
-                                           mode='lines')
+            # vertices, filled_indices, outline_indices = self.create_cube(data.shape)
+            # self.axis = scene.visuals.Mesh(vertices['position'],
+            #                                outline_indices,
+            #                                color="white",
+            #                                parent=self.view.scene,
+            #                                mode='lines')
+            #
+            # from shwirl.extern.vispy.gloo import gl
+            # gl.glLineWidth(1.5)
+            #
+            # self.view.add(self.axis)
 
-            from shwirl.extern.vispy.gloo import gl
-            gl.glLineWidth(1.5)
+            # %%%%%%%%%%%%%%%%%%%%%%%%%%
+            # Axes labels
+            # %%%%%%%%%%%%%%%%%%%%%%%%%%
+            self.data_shape = data.shape
 
-            self.view.add(self.axis)
+            self.aspect = [1., 1., 1.]
+            self.aspect[0] = 1.
+            self.aspect[1] = self.data_shape[1] / self.data_shape[2]
+            self.aspect[2] = self.data_shape[0] / self.data_shape[2]
+
+            scale_cube = [2 / self.data_shape[2] * 1 * self.aspect[0],
+                          2 / self.data_shape[1] * 1 * self.aspect[1],
+                          2 / self.data_shape[0] * 1 * self.aspect[2]]
+
+            translate_cube = [-0.5 * self.data_shape[2] * scale_cube[0],
+                              -0.5 * self.data_shape[1] * scale_cube[1],
+                              -0.5 * self.data_shape[0] * scale_cube[2]]
+
+            self.volume.transform = scene.STTransform(scale=scale_cube,
+                                                      translate=translate_cube)
+
+            scale_axis = [self.aspect[0],
+                          self.aspect[1],
+                          self.aspect[2]]
+
+            self.axes = AxesVisual3D(axis_color="white", tick_color="white", text_color="white",
+                                     tick_width=1.5, minor_tick_length=0,
+                                     major_tick_length=15, axis_width=0,
+                                     tick_label_margin=40, axis_label_margin=200,
+                                     tick_font_size=28, axis_font_size=45,
+                                     view=self.view,
+                                     transform=scene.STTransform(scale=scale_axis))
+
+            self.axes.xlabel = self.axes_info[0]['label']
+            self.axes.ylabel = self.axes_info[1]['label']
+            self.axes.zlabel = self.axes_info[2]['label']
+
+            self.axes.xlim = self.axes_info[0]['minval'], self.axes_info[0]['maxval']
+            self.axes.ylim = self.axes_info[1]['minval'], self.axes_info[1]['maxval']
+            self.axes.zlim = self.axes_info[2]['minval'], self.axes_info[2]['maxval']
+            # %%%%%%%%%%%%%%%%%%%%%%%%%%
 
             # Cheat to make the box width bigger.
             #
@@ -1636,6 +1681,34 @@ class Canvas3D(scene.SceneCanvas):
         self.axis.transform = self.volume.transform = scene.STTransform(scale=(scalex, scalez, scaley),
                                                                         translate=(
                                                                         -scalex ** 2, -scalez ** 2, -scaley ** 2))
+    def parse_header_info(self, cube):
+        # create 3
+        self.axes_info = [{}, {}, {}]
+
+        # CTYPE1, CRVAL1, and CDELT1
+        print(cube[0].data.shape)
+        if len(cube[0].data.shape) == 4:
+            # Test
+            # cube[0].data = np.swapaxes(cube[0].data, 0, 1)
+            index = [1, 3, 2]
+            for i in range(3):
+                self.axes_info[i]['label'] = cube[0].header['CTYPE' + str(index[i])]
+                self.axes_info[i]['minval'] = cube[0].header['CRVAL' + str(index[i])]
+                self.axes_info[i]['maxval'] = (cube[0].data[0].shape[2 - i] * cube[0].header['CDELT' + str(index[i])]) - \
+                                              self.axes_info[i]['minval']
+
+            # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
+            data = cube[0].data[0][:2048, :2048, :2048]
+            # data = cube[0].data[0][75:150, 110:150, 100:150]
+
+            self.vel_axis = cube[0].data[0].shape[0]
+        else:
+            index = [1, 3, 2]
+            for i in range(3):
+                self.axes_info[i]['label'] = cube[0].header['CTYPE' + str(index[i])]
+                self.axes_info[i]['minval'] = cube[0].header['CRVAL' + str(index[i])]
+                self.axes_info[i]['maxval'] = (cube[0].data.shape[2 - i] * cube[0].header['CDELT' + str(index[i])]) - \
+                                              cube[0].header['CRVAL' + str(index[i])]
 
     def set_transform(self, x, y, z):
         """Set the transform.
