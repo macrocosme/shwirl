@@ -8,9 +8,9 @@ import numpy as np
 # Vispy imports
 from .extern.vispy import app, scene, io
 from .extern.vispy.color import get_colormaps
+from .extern.vispy.gloo import gl
 from .shaders import RenderVolume
 from .shaders.axes import AxesVisual3D
-
 # Astropy imports
 from astropy.io import fits
 
@@ -516,6 +516,7 @@ class ObjectWidget(QWidget):
             self.cmap = sorted(list(get_colormaps().keys()), key=str.lower)
             self.combo_cmap = QComboBox(self)
             self.combo_cmap.addItems(self.cmap)
+            self.combo_cmap.setCurrentIndex(self.cmap.index('hsl'))
             self.combo_cmap.currentIndexChanged.connect(self.update_param)
             array = [l_cmap, self.combo_cmap]
             serialize_widgets('cmap', '', array)
@@ -1140,7 +1141,7 @@ class Canvas3D(scene.SceneCanvas):
             # except:
             #     self.vel = "unknown"
 
-            self.parse_header_info(cube)
+            self.parse_header_info_for_axes_labels(cube)
 
             # print(cube[0].data.shape)
             if len(cube[0].data.shape) == 4:
@@ -1250,42 +1251,37 @@ class Canvas3D(scene.SceneCanvas):
             # Axes labels
             # %%%%%%%%%%%%%%%%%%%%%%%%%%
             self.data_shape = data.shape
+            self.axis = AxesVisual3D(
+                parent=self.view.scene,
+                data_shape=self.data_shape,
+                axis_color="white",
+                tick_color="white",
+                text_color="white",
+                tick_width=1.5,
+                minor_tick_length=0,
+                major_tick_length=50,
+                axis_width=1.5,
+                tick_label_margin=5,
+                axis_label_margin=10,
+                tick_font_size=10,
+                axis_font_size=15,
+                view=self.view,
+                transform=scene.STTransform(
+                    scale=(1, 1, 1),
+                    translate=(0, 0, 0),
+                )
+            )
 
-            self.aspect = [1., 1., 1.]
-            self.aspect[0] = 1.
-            self.aspect[1] = self.data_shape[1] / self.data_shape[2]
-            self.aspect[2] = self.data_shape[0] / self.data_shape[2]
+            self.axis.xlabel = self.axes_info[0]['label']
+            self.axis.ylabel = self.axes_info[1]['label']
+            self.axis.zlabel = self.axes_info[2]['label']
 
-            scale_cube = [2 / self.data_shape[2] * 1 * self.aspect[0],
-                          2 / self.data_shape[1] * 1 * self.aspect[1],
-                          2 / self.data_shape[0] * 1 * self.aspect[2]]
+            self.axis.xlim = self.axes_info[0]['minval'], self.axes_info[0]['maxval']
+            self.axis.ylim = self.axes_info[1]['minval'], self.axes_info[1]['maxval']
+            self.axis.zlim = self.axes_info[2]['minval'], self.axes_info[2]['maxval']
 
-            translate_cube = [-0.5 * self.data_shape[2] * scale_cube[0],
-                              -0.5 * self.data_shape[1] * scale_cube[1],
-                              -0.5 * self.data_shape[0] * scale_cube[2]]
-
-            self.volume.transform = scene.STTransform(scale=scale_cube,
-                                                      translate=translate_cube)
-
-            scale_axis = [self.aspect[0],
-                          self.aspect[1],
-                          self.aspect[2]]
-
-            self.axes = AxesVisual3D(axis_color="white", tick_color="white", text_color="white",
-                                     tick_width=1.5, minor_tick_length=0,
-                                     major_tick_length=15, axis_width=0,
-                                     tick_label_margin=40, axis_label_margin=200,
-                                     tick_font_size=28, axis_font_size=45,
-                                     view=self.view,
-                                     transform=scene.STTransform(scale=scale_axis))
-
-            self.axes.xlabel = self.axes_info[0]['label']
-            self.axes.ylabel = self.axes_info[1]['label']
-            self.axes.zlabel = self.axes_info[2]['label']
-
-            self.axes.xlim = self.axes_info[0]['minval'], self.axes_info[0]['maxval']
-            self.axes.ylim = self.axes_info[1]['minval'], self.axes_info[1]['maxval']
-            self.axes.zlim = self.axes_info[2]['minval'], self.axes_info[2]['maxval']
+            # Increase line width for more visibility
+            gl.glLineWidth(1.5)
             # %%%%%%%%%%%%%%%%%%%%%%%%%%
 
             # Cheat to make the box width bigger.
@@ -1322,100 +1318,6 @@ class Canvas3D(scene.SceneCanvas):
         except ValueError as e:
             t = e
             print(t)
-
-    def create_cube(self, shape):
-        """ Generate vertices & indices for a filled and outlined cube
-
-        Parameters
-        ----------
-        shape : list
-            List representing the shape of the numpy array.
-
-        Returns
-        -------
-        vertices : array
-            Array of vertices suitable for use as a VertexBuffer.
-        filled : array
-            Indices to use to produce a filled cube.
-        outline : array
-            Indices to use to produce an outline of the cube.
-        """
-        vtype = [('position', np.float32, 3),
-                 ('texcoord', np.float32, 2),
-                 ('normal', np.float32, 3),
-                 ('color', np.float32, 4)]
-        itype = np.uint32
-
-        # Vertices positions
-        x0, x1 = -0.5, shape[2] - 0.5
-        y0, y1 = -0.5, shape[1] - 0.5
-        z0, z1 = -0.5, shape[0] - 0.5
-
-        p = np.array([[x0, y0, z0],
-                      [x1, y0, z0],
-                      [x0, y1, z0],
-                      [x1, y1, z0],
-                      [x0, y0, z1],
-                      [x1, y0, z1],
-                      [x0, y1, z1],
-                      [x1, y1, z1]])
-
-        # Face Normals
-        n = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0],
-                      [-1, 0, 1], [0, -1, 0], [0, 0, -1]])
-
-        # Vertice colors
-        c = np.array([[1, 1, 1, 1], [0, 1, 1, 1], [0, 0, 1, 1], [1, 0, 1, 1],
-                      [1, 0, 0, 1], [1, 1, 0, 1], [0, 1, 0, 1], [0, 0, 0, 1]])
-
-        # Texture coords
-        t = np.array([[0, 0], [0, 1], [1, 1], [1, 0]])
-
-        faces_p = [0, 1, 2, 3,
-                   0, 3, 4, 5,
-                   0, 5, 6, 1,
-                   1, 6, 7, 2,
-                   7, 4, 3, 2,
-                   4, 7, 6, 5]
-        faces_c = [0, 1, 2, 3,
-                   0, 3, 4, 5,
-                   0, 5, 6, 1,
-                   1, 6, 7, 2,
-                   7, 4, 3, 2,
-                   4, 7, 6, 5]
-        faces_n = [0, 0, 0, 0,
-                   1, 1, 1, 1,
-                   2, 2, 2, 2,
-                   3, 3, 3, 3,
-                   4, 4, 4, 4,
-                   5, 5, 5, 5]
-        faces_t = [0, 1, 2, 3,
-                   0, 1, 2, 3,
-                   0, 1, 2, 3,
-                   3, 2, 1, 0,
-                   0, 1, 2, 3,
-                   0, 1, 2, 3]
-
-        vertices = np.zeros(24, vtype)
-        vertices['position'] = p[faces_p]
-        vertices['normal'] = n[faces_n]
-        vertices['color'] = c[faces_c]
-        vertices['texcoord'] = t[faces_t]
-
-        filled = np.resize(
-            np.array([0, 1, 2, 0, 2, 3], dtype=itype), 6 * (2 * 3))
-        filled += np.repeat(4 * np.arange(6, dtype=itype), 6)
-        filled = filled.reshape((len(filled) // 3, 3))
-
-        outline = np.resize(
-            np.array([0, 1, 1, 3, 3, 2, 2, 0], dtype=itype), 6 * (2 * 4))
-        # outline += np.repeat(4 * np.arange(6, dtype=itype), 8)
-
-        outline = np.array([0, 1, 0, 2, 2, 3, 1, 3,
-                            0, 6, 1, 7, 2, 10, 3, 14,
-                            6, 7, 6, 10, 10, 14, 7, 14])  # 3,11, ])#2,9, 3,10 ])
-
-        return vertices, filled, outline
 
     def set_rendering_params(self, tf_method, cmap, combo_color_method, interpolation_method):
         """Set rendering parameters for the visualised volume.
@@ -1677,48 +1579,31 @@ class Canvas3D(scene.SceneCanvas):
         scalez: int, float
             scaling factor for the z axis
         """
-        # TODO: get translation right to stay centered.
-        self.axis.transform = self.volume.transform = scene.STTransform(scale=(scalex, scalez, scaley),
-                                                                        translate=(
-                                                                        -scalex ** 2, -scalez ** 2, -scaley ** 2))
-    def parse_header_info(self, cube):
-        # create 3
-        self.axes_info = [{}, {}, {}]
+        self.axis.transform = self.volume.transform = scene.STTransform(
+            scale=(scalex, scalez, scaley),
+            translate=(-scalex ** 2, -scalez ** 2, -scaley ** 2)
+        )
 
-        # CTYPE1, CRVAL1, and CDELT1
-        print(cube[0].data.shape)
+    def parse_header_info_for_axes_labels(self, cube):
+        """Collect information from cube's header
+
+        :param cube: astropy.fits
+        """
+        self.axes_info = [{}, {}, {}]
         if len(cube[0].data.shape) == 4:
-            # Test
-            # cube[0].data = np.swapaxes(cube[0].data, 0, 1)
             index = [1, 3, 2]
             for i in range(3):
                 self.axes_info[i]['label'] = cube[0].header['CTYPE' + str(index[i])]
                 self.axes_info[i]['minval'] = cube[0].header['CRVAL' + str(index[i])]
-                self.axes_info[i]['maxval'] = (cube[0].data[0].shape[2 - i] * cube[0].header['CDELT' + str(index[i])]) - \
-                                              self.axes_info[i]['minval']
-
-            # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-            data = cube[0].data[0][:2048, :2048, :2048]
-            # data = cube[0].data[0][75:150, 110:150, 100:150]
-
-            self.vel_axis = cube[0].data[0].shape[0]
+                self.axes_info[i]['maxval'] = (cube[0].data[0].shape[2 - i] *
+                                               cube[0].header['CDELT' + str(index[i])]) - self.axes_info[i]['minval']
         else:
             index = [1, 3, 2]
             for i in range(3):
                 self.axes_info[i]['label'] = cube[0].header['CTYPE' + str(index[i])]
                 self.axes_info[i]['minval'] = cube[0].header['CRVAL' + str(index[i])]
-                self.axes_info[i]['maxval'] = (cube[0].data.shape[2 - i] * cube[0].header['CDELT' + str(index[i])]) - \
-                                              cube[0].header['CRVAL' + str(index[i])]
-
-    def set_transform(self, x, y, z):
-        """Set the transform.
-
-        Deprecated.
-        """
-        self.unfreeze()
-        self.axis.transform = self.volume.transform = scene.STTransform(translate=(x, y, z))
-        self.freeze()
-
+                self.axes_info[i]['maxval'] = (cube[0].data.shape[2 - i] *
+                                               cube[0].header['CDELT' + str(index[i])]) - cube[0].header['CRVAL' + str(index[i])]
 
 
 # -----------------------------------------------------------------------------
