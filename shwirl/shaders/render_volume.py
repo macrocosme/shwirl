@@ -823,14 +823,76 @@ ISO_SNIPPETS = dict(
     after_loop="""
         """,
 )
-
 ISO_FRAG_SHADER = FRAG_SHADER.format(**ISO_SNIPPETS)
+
+MINIP_SNIPPETS = dict(
+    before_loop="""
+        float maxval = -99999.0; // maximum encountered 
+        float minval = 99999.0; // The minimum encountered value
+        int mini = 0;  // Where the minimum value was encountered
+        """,
+    in_loop="""
+        if( val > maxval ) {
+            maxval = val;
+        }    
+        if( val < minval ) {
+            minval = val;
+            mini = iter;
+        }
+        """,
+    after_loop="""
+        // Refine search for min value
+        loc = start_loc + step * (float(mini) - 0.5);
+
+        for (int i=0; i<10; i++) {
+            minval = min(minval, $sample(u_volumetex, loc).g);
+            loc += step * 0.1;
+        }
+
+        if (minval > u_high_discard_filter_value || minval < u_low_discard_filter_value)
+        {{
+            minval = 0.;
+        }}
+
+        // Color is associated to voxel intensity
+        if (u_color_method == 0) {
+            gl_FragColor = $cmap(minval);
+            //gl_FragColor.a = minval;
+        }
+        else{
+            // Color is associated to redshift/velocity
+            if (u_color_method == 1) {
+                gl_FragColor = $cmap(loc.y);
+
+                //if (minval == 0)
+                    gl_FragColor.a = 1-minval;
+            }
+            // Color is associated to RGB cube
+            else {
+                if (u_color_method == 2) {
+                    gl_FragColor.r = loc.y;
+                    gl_FragColor.g = loc.z;
+                    gl_FragColor.b = loc.x;
+                    gl_FragColor.a = minval;
+                }
+                // Case 4: Mom2
+                // TODO: verify implementation of MIP-mom2.
+                else {
+                   gl_FragColor = $cmap((minval * ((minval - loc.y) * (minval - loc.y))) / minval);
+                }
+            }
+        }
+
+        """,
+)
+MINIP_FRAG_SHADER = FRAG_SHADER.format(**MINIP_SNIPPETS)
 
 frag_dict = {
     'mip': MIP_FRAG_SHADER,
     'lmip': LMIP_FRAG_SHADER,
     'iso': ISO_FRAG_SHADER,
     'avip': TRANSLUCENT_FRAG_SHADER,
+    'minip': MINIP_FRAG_SHADER,
     'translucent2': TRANSLUCENT2_FRAG_SHADER,
     'additive': ADDITIVE_FRAG_SHADER,
 }
@@ -857,7 +919,7 @@ frag_dict = {
 
 class RenderVolumeVisual(Visual):
     """ Displays a 3D Volume
-    
+
     Parameters
     ----------
     vol : ndarray
@@ -883,7 +945,7 @@ class RenderVolumeVisual(Visual):
         but has lower performance on desktop platforms.
     """
 
-    def __init__(self, vol, clim=None, method='mip', threshold=None, 
+    def __init__(self, vol, clim=None, method='mip', threshold=None,
                  relative_step_size=0.8, cmap='grays',
                  emulate_texture=False, color_scale='linear',
                  filter_type = 0, filter_size = 1,
@@ -1324,7 +1386,7 @@ class RenderVolumeVisual(Visual):
         self.shared_program['u_low_discard_filter_value'] = self._low_discard_filter_value
 
         self.update()
-        
+
     @property
     def density_factor(self):
         return self._density_factor
@@ -1340,14 +1402,14 @@ class RenderVolumeVisual(Visual):
     @property
     def relative_step_size(self):
         """ The relative step size used during raycasting.
-        
+
         Larger values yield higher performance at reduced quality. If
         set > 2.0 the ray skips entire voxels. Recommended values are
         between 0.5 and 1.5. The amount of quality degradation depends
         on the render method.
         """
         return self._relative_step_size
-    
+
     @relative_step_size.setter
     def relative_step_size(self, value):
         value = float(value)
@@ -1358,12 +1420,12 @@ class RenderVolumeVisual(Visual):
 
     def _create_vertex_data(self):
         """ Create and set positions and texture coords from the given shape
-        
+
         We have six faces with 1 quad (2 triangles) each, resulting in
         6*2*3 = 36 vertices in total.
         """
         shape = self._vol_shape
-        
+
         # Get corner coordinates. The -0.5 offset is to center
         # pixels/voxels. This works correctly for anisotropic data.
         x0, x1 = -0.5, shape[2] - 0.5
@@ -1390,12 +1452,12 @@ class RenderVolumeVisual(Visual):
         |/      |/
         0-------1
         """
-        
+
         # Order is chosen such that normals face outward; front faces will be
         # culled.
         indices = np.array([2, 6, 0, 4, 5, 6, 7, 2, 3, 0, 1, 5, 3, 7],
                            dtype=np.uint32)
-        
+
         # Apply
         self._vertices.set_data(pos)
         self._index_buffer.set_data(indices)
