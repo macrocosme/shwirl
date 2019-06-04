@@ -876,6 +876,34 @@ MINIP_SNIPPETS = dict(
                     gl_FragColor.b = loc.x;
                     gl_FragColor.a = minval;
                 }
+                // Color by sigma values
+                else if (u_color_method == 3) {
+                    
+                    if ( (1-minval < (u_volume_mean + (3.0 * u_volume_std)))  ) 
+                    {
+                        gl_FragColor =  vec4(0., 0., 1., 1-minval);
+                    }
+                    
+                    // < 3 sigmas
+                    if ( (1-minval >= (u_volume_mean + (3.0 * u_volume_std))) && 
+                         (1-minval < (u_volume_mean + (4.0 * u_volume_std))) ) 
+                    {
+                        gl_FragColor =  vec4(0., 1., 0., 1-minval);
+                    }
+                    
+                    if ( (1-minval >= (u_volume_mean + (4.0 * u_volume_std))) && 
+                         (1-minval < (u_volume_mean + (5.0 * u_volume_std))) ) 
+                    {
+                        gl_FragColor =  vec4(1., 0., 0., 1-minval);
+                    }
+                    
+                    if ( (1-minval >= (u_volume_mean + (5.0 * u_volume_std))) ) 
+                        
+                    {
+                        gl_FragColor =  vec4(1., 1., 1., 1-minval);
+                    }
+                }
+                
                 // Case 4: Mom2
                 // TODO: verify implementation of MIP-mom2.
                 else {

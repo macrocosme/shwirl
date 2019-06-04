@@ -2,11 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="bf449828-78cd-4895-b068-c4418cb3a332" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shwirl.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/shwirl.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/shwirl/shaders/render_volume.py" beforeDir="false" afterPath="$PROJECT_DIR$/shwirl/shaders/render_volume.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shwirl/shwirl.py" beforeDir="false" afterPath="$PROJECT_DIR$/shwirl/shwirl.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -15,7 +12,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="CoverageDataManager">
-    <SUITE FILE_PATH="coverage/shwirl$main.coverage" NAME="main Coverage Results" MODIFIED="1559684742596" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/shwirl$main.coverage" NAME="main Coverage Results" MODIFIED="1559687822129" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/shwirl$shwirl.coverage" NAME="shwirl Coverage Results" MODIFIED="1556536834856" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/shwirl" />
   </component>
   <component name="FUSProjectUsageTrigger">
@@ -60,23 +57,23 @@
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="py" value="165" />
+          <entry key="py" value="194" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
-          <entry key="Python" value="165" />
+          <entry key="Python" value="194" />
         </counts>
       </usages-collector>
     </session>
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/shwirl/shwirl.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="129">
-              <caret line="1232" column="26" selection-start-line="1232" selection-start-column="26" selection-end-line="1232" selection-end-column="26" />
+              <caret line="1232" column="26" lean-forward="true" selection-start-line="1232" selection-start-column="26" selection-end-line="1232" selection-end-column="26" />
               <folding>
                 <element signature="e#24#55#0" expanded="true" />
               </folding>
@@ -84,11 +81,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/shwirl/shaders/render_volume.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="271">
-              <caret line="544" column="69" selection-start-line="544" selection-start-column="69" selection-end-line="544" selection-end-column="69" />
+            <state relative-caret-position="185">
+              <caret line="1129" lean-forward="true" selection-start-line="1129" selection-end-line="1129" />
               <folding>
                 <element signature="e#0#31#0" expanded="true" />
               </folding>
@@ -109,8 +106,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>2048</find>
-      <find>Waterfall</find>
       <find>swap</find>
       <find>swapaxes</find>
       <find>s</find>
@@ -139,9 +134,12 @@
       <find>parse_header_info_for_axes_labels</find>
       <find>clim_vel</find>
       <find>cube[0]</find>
+      <find>maxval</find>
+      <find>mean</find>
     </findStrings>
     <replaceStrings>
       <replace>cube</replace>
+      <replace>minval</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -151,8 +149,8 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/shwirl/extern/vispy/visuals/colorbar.py" />
-        <option value="$PROJECT_DIR$/shwirl/shaders/render_volume.py" />
         <option value="$PROJECT_DIR$/shwirl/shwirl.py" />
+        <option value="$PROJECT_DIR$/shwirl/shaders/render_volume.py" />
       </list>
     </option>
   </component>
@@ -354,22 +352,22 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/shwirl/shaders/render_volume.py">
+    <entry file="file://$PROJECT_DIR$/shwirl/shwirl.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="271">
-          <caret line="544" column="69" selection-start-line="544" selection-start-column="69" selection-end-line="544" selection-end-column="69" />
+        <state relative-caret-position="129">
+          <caret line="1232" column="26" lean-forward="true" selection-start-line="1232" selection-start-column="26" selection-end-line="1232" selection-end-column="26" />
           <folding>
-            <element signature="e#0#31#0" expanded="true" />
+            <element signature="e#24#55#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/shwirl/shwirl.py">
+    <entry file="file://$PROJECT_DIR$/shwirl/shaders/render_volume.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="129">
-          <caret line="1232" column="26" selection-start-line="1232" selection-start-column="26" selection-end-line="1232" selection-end-column="26" />
+        <state relative-caret-position="185">
+          <caret line="1129" lean-forward="true" selection-start-line="1129" selection-end-line="1129" />
           <folding>
-            <element signature="e#24#55#0" expanded="true" />
+            <element signature="e#0#31#0" expanded="true" />
           </folding>
         </state>
       </provider>
