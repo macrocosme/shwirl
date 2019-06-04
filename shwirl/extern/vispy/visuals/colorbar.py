@@ -308,8 +308,8 @@ class ColorBarVisual(CompoundVisual):
 
         # Let's assume both limits have the same type.
         if isfloat(self._clim[0]):
-            self._ticks.append(TextVisual("{:.4f}".format(self._clim[0]), color=self._label_color))
-            self._ticks.append(TextVisual("{:.4f}".format(self._clim[1]), color=self._label_color))
+            self._ticks.append(TextVisual("{:.2f}".format(self._clim[0]), color=self._label_color))
+            self._ticks.append(TextVisual("{:.2f}".format(self._clim[1]), color=self._label_color))
         else:
             self._ticks.append(TextVisual(str(self._clim[0]), color=self._label_color))
             self._ticks.append(TextVisual(str(self._clim[1]), color=self._label_color))
@@ -353,8 +353,8 @@ class ColorBarVisual(CompoundVisual):
             self._ticks[0].text = str(self._clim[0])
             self._ticks[1].text = str(self._clim[1])
         else:
-            self._ticks[0].text = "{:.4f}".format(self._clim[0])
-            self._ticks[1].text = "{:.4f}".format(self._clim[1])
+            self._ticks[0].text = "{:.2f}".format(self._clim[0])
+            self._ticks[1].text = "{:.2f}".format(self._clim[1])
 
         self._update_positions()
 
