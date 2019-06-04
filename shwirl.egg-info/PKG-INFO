@@ -1,0 +1,26 @@
+Metadata-Version: 1.1
+Name: shwirl
+Version: 0.1.12
+Summary: Meaningful colouring of spectral cube data with volume rendering
+Home-page: https://github.com/macrocosme/shwirl
+Author: Dany Vohl
+Author-email: danyvohl@gmail.com
+License: MIT
+Description: UNKNOWN
+Keywords: visualisation astronomy spectral cubes
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Scientific/Engineering :: Visualization
+Classifier: Topic :: Scientific/Engineering :: Astronomy
+Classifier: Topic :: Scientific/Engineering :: Information Analysis
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7

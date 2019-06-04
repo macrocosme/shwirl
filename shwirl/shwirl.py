@@ -1258,14 +1258,15 @@ class Canvas3D(scene.SceneCanvas):
 
             self.parse_header_info_for_axes_labels(cube)
 
-            # print(cube[0].data.shape)
-            if len(cube[0].data.shape) == 4:
+            # print(cube.data.shape)
+            if len(cube.data.shape) == 4:
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-                data = cube[0].data[0][:2048, :2048, :2048]
+                data = cube.data[0][:2048, :2048, :2048]
 
                 self.vel_axis = cube.data[0].shape[0]
             else:
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
+                print (cube.shape)
                 data = cube.data[:2048, :2048, :2048]
                 # data = cube.data[:,60:-60,:]
                 # data = cube.data[:, :, :]
@@ -1706,20 +1707,20 @@ class Canvas3D(scene.SceneCanvas):
         :param cube: astropy.fits
         """
         self.axes_info = [{}, {}, {}]
-        if len(cube[0].data.shape) == 4:
+        if len(cube.data.shape) == 4:
             index = [1, 3, 2]
             for i in range(3):
-                self.axes_info[i]['label'] = cube[0].header['CTYPE' + str(index[i])]
-                self.axes_info[i]['minval'] = cube[0].header['CRVAL' + str(index[i])]
-                self.axes_info[i]['maxval'] = (cube[0].data[0].shape[2 - i] *
-                                               cube[0].header['CDELT' + str(index[i])]) - self.axes_info[i]['minval']
+                self.axes_info[i]['label'] = cube.header['CTYPE' + str(index[i])]
+                self.axes_info[i]['minval'] = cube.header['CRVAL' + str(index[i])]
+                self.axes_info[i]['maxval'] = (cube.data[0].shape[2 - i] *
+                                               cube.header['CDELT' + str(index[i])]) - self.axes_info[i]['minval']
         else:
             index = [1, 3, 2]
             for i in range(3):
-                self.axes_info[i]['label'] = cube[0].header['CTYPE' + str(index[i])]
-                self.axes_info[i]['minval'] = cube[0].header['CRVAL' + str(index[i])]
-                self.axes_info[i]['maxval'] = (cube[0].data.shape[2 - i] *
-                                               cube[0].header['CDELT' + str(index[i])]) - cube[0].header['CRVAL' + str(index[i])]
+                self.axes_info[i]['label'] = cube.header['CTYPE' + str(index[i])]
+                self.axes_info[i]['minval'] = cube.header['CRVAL' + str(index[i])]
+                self.axes_info[i]['maxval'] = (cube.data.shape[2 - i] *
+                                               cube.header['CDELT' + str(index[i])]) - cube.header['CRVAL' + str(index[i])]
 
 
 # -----------------------------------------------------------------------------

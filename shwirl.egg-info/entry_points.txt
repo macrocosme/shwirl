@@ -1,0 +1,3 @@
+[console_scripts]
+shwirl = shwirl.shwirl:main
+

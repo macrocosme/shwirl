@@ -536,18 +536,19 @@ MIP_SNIPPETS = dict(
             
             // < 3 sigmas
             if ( (maxval >= (u_volume_mean + (3.0 * u_volume_std))) && 
-                 (maxval < (u_volume_mean + (4.0 * u_volume_std))) )  
+                 (maxval < (u_volume_mean + (4.0 * u_volume_std))) ) 
             {
                 gl_FragColor =  vec4(0., 1., 0., maxval);
             }
             
             if ( (maxval >= (u_volume_mean + (4.0 * u_volume_std))) && 
-                 (maxval < (u_volume_mean + (5.0 * u_volume_std))) )  
+                 (maxval < (u_volume_mean + (5.0 * u_volume_std))) ) 
             {
                 gl_FragColor =  vec4(1., 0., 0., maxval);
             }
             
-            if ( (maxval >= (u_volume_mean + (5.0 * u_volume_std))) )  
+            if ( (maxval >= (u_volume_mean + (5.0 * u_volume_std))) ) 
+                
             {
                 gl_FragColor =  vec4(1., 1., 1., maxval);
             }
