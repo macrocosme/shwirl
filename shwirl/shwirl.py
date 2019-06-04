@@ -12,6 +12,7 @@ from .shaders import RenderVolume
 
 # Astropy imports
 from astropy.io import fits
+from blimpy import Waterfall
 
 # PyQt5 imports
 try:
@@ -140,7 +141,12 @@ class MainWindow(QMainWindow):
         sets rendering parameters and view.
         """
         self.Canvas3D.set_volume_scene(self.props['load_button'].loaded_cube)
-        self.fits_infos.print_header(self.props['load_button'].loaded_cube[0].header)
+        try:
+            self.fits_infos.print_header(self.props['load_button'].loaded_cube[0].header, 'fits')
+        except:
+            # This is shady. The type should be properly assessed.
+            self.fits_infos.print_header(self.props['load_button'].loaded_cube.header, 'filterbank')
+            pass
 
         for type in self.widget_types:
             self.props[type].update_discard_filter_text(self.props['load_button'].vol_min,
@@ -302,7 +308,7 @@ class FitsMetaWidget(QWidget):
 
         self.setLayout(vbox)
 
-    def print_header(self, header):
+    def print_header(self, header, type='fits'):
         """Print the Primary HDU information of the fits file
 
         Parameters
@@ -311,14 +317,23 @@ class FitsMetaWidget(QWidget):
                 HDU taken from a fits file.
         """
         self.l_header.clear()
-        self.l_header.insertPlainText('card\tvalue\tcomment\n')
-        for card in header.cards:
-            self.l_header.setTextColor(QColor('blue'))
-            self.l_header.insertPlainText(str(card[0]) + "\t")
-            self.l_header.setTextColor(QColor('black'))
-            self.l_header.insertPlainText(str(card[1]) + "\t")
-            self.l_header.setTextColor(QColor('red'))
-            self.l_header.insertPlainText(str(card[2]) + "\n")
+        if type=='fits':
+            self.l_header.insertPlainText('card\tvalue\tcomment\n')
+            for card in header.cards:
+                self.l_header.setTextColor(QColor('blue'))
+                self.l_header.insertPlainText(str(card[0]) + "\t")
+                self.l_header.setTextColor(QColor('black'))
+                self.l_header.insertPlainText(str(card[1]) + "\t")
+                self.l_header.setTextColor(QColor('red'))
+                self.l_header.insertPlainText(str(card[2]) + "\n")
+        elif type=='filterbank':
+            self.l_header.insertPlainText('card\t\tvalue\n')
+            for key in header.keys():
+                self.l_header.setTextColor(QColor('blue'))
+                self.l_header.insertPlainText("%s\t\t" % (key))
+                self.l_header.setTextColor(QColor('black'))
+                self.l_header.insertPlainText("%s\n" % (str(header[key])))
+
 
         sb = self.l_header.verticalScrollBar()
         sb.setValue(sb.maximum())
@@ -480,7 +495,7 @@ class ObjectWidget(QWidget):
                 widget.hide()
 
             l_color_method = QLabel("Colour method ")
-            self.color_method = ['Moment 0', 'Moment 1', 'rgb_cube']
+            self.color_method = ['Moment 0', 'Moment 1', 'Sigmas', 'rgb_cube']
             self.combo_color_method = QComboBox(self)
             self.combo_color_method.addItems(self.color_method)
             self.combo_color_method.currentIndexChanged.connect(self.update_param)
@@ -653,40 +668,122 @@ class ObjectWidget(QWidget):
 
         self.signal_objet_changed.emit()
 
+    def clean_data(self, data, threshold_time=3.25, threshold_frequency=2.75, bin_size=32,
+                  n_iter_time=3, n_iter_frequency=3, clean_type='time'):
+        """ Take filterbank object and mask
+        RFI time samples with average spectrum.
+        Parameters:
+        ----------
+        data :
+            filterbank data object
+        threshold_time : float
+            units of sigma
+        threshold_frequency : float
+            units of sigma
+        bin_size : int
+            quantization bin size
+        n_iter_time : int
+            Number of iteration for time cleaning
+        n_iter_frequency : int
+            Number of iteration for frequency cleaning
+        clean_type : str
+            type of cleaning to be done.
+            Accepted values: 'time', 'frequency', 'both'
+        Returns:
+        -------
+        cleaned filterbank object
+        """
+        # Clean in time
+        print (type(data))
+        print(data.shape)
+
+        if clean_type in ['time', 'both']:
+            for i in range(n_iter_time):
+                dfmean = np.mean(data, axis=0)
+                dtmean = np.mean(data, axis=1)
+
+                # ('data.data', (1536, 265149), 'dfmean', (265149,), 'dtmean', (1536,))
+
+                stdevf = np.std(dfmean)
+                medf = np.median(dfmean)
+                maskf = np.where(np.abs(dfmean - medf) > threshold_time * stdevf)[0]
+
+                # replace with mean spectrum
+                data[:, maskf] = dtmean[:, None] * np.ones(len(maskf))[None]
+
+        # Clean in frequency
+        # remove bandpass by averaging over bin_size ajdacent channels
+        if clean_type in ['frequency', 'both']:
+            for i in range(n_iter_frequency):
+                for i in range(data.shape[1]):
+                    dtmean_nobandpass = data[:, i] - dtmean.reshape(-1, bin_size).mean(-1).repeat(bin_size)
+                    stdevt = np.std(dtmean_nobandpass)
+                    medt = np.median(dtmean_nobandpass)
+                    maskt = np.abs(dtmean_nobandpass - medt) > threshold_frequency * stdevt
+
+                    # replace with mean bin values
+                    data[maskt, i] = dtmean.reshape(-1, bin_size).mean(-1).repeat(bin_size)[maskt]
+        return data
+
     def showLoadFitsDialog(self):
         """Show the dialog window to load a fits file.
         """
         filename = QFileDialog.getOpenFileName(self,
                                                'Open file',
                                                filter='FITS Images (*.fits, *.FITS)')
+                                               #filter='FITS Images (*.fits, *.FITS); SigProc Filterbank (*.fil)')
 
         if filename[0] != "":
-            # Load file
-            # print(filename)
-            self.loaded_cube = fits.open(filename[0])
+            if filename[0].split('.')[-1] in ['fits', 'FITS']:
+                # Load file
+                # print(filename)
+                self.loaded_cube = fits.open(filename[0])
 
-            try:
-                self.vol_min = self.loaded_cube[0].header["DATAMIN"]
-                self.vol_max = self.loaded_cube[0].header["DATAMAX"]
+                try:
+                    self.vol_min = self.loaded_cube[0].header["DATAMIN"]
+                    self.vol_max = self.loaded_cube[0].header["DATAMAX"]
 
-                # print("DATAMIN", self.vol_min)
-                # print("DATAMAX", self.vol_max)
-            except:
-                # print("Warning: DATAMIN and DATAMAX not present in header; evaluating min and max")
-                if self.loaded_cube[0].header["NAXIS"] == 3:
-                    self.vol_min = np.nanmin(self.loaded_cube[0].data)
-                    self.vol_max = np.nanmax(self.loaded_cube[0].data)
-                else:
-                    self.vol_min = np.nanmin(self.loaded_cube[0].data[0])
-                    self.vol_max = np.nanmax(self.loaded_cube[0].data[0])
+                    # print("DATAMIN", self.vol_min)
+                    # print("DATAMAX", self.vol_max)
+                except:
+                    # print("Warning: DATAMIN and DATAMAX not present in header; evaluating min and max")
+                    if self.loaded_cube[0].header["NAXIS"] == 3:
+                        self.vol_min = np.nanmin(self.loaded_cube[0].data)
+                        self.vol_max = np.nanmax(self.loaded_cube[0].data)
+                    else:
+                        self.vol_min = np.nanmin(self.loaded_cube[0].data[0])
+                        self.vol_max = np.nanmax(self.loaded_cube[0].data[0])
 
-            # # Will trigger update clim
-            # self.l_clim_min.setText(str(min))
-            # self.l_clim_max.setText(str(max))
+                # # Will trigger update clim
+                # self.l_clim_min.setText(str(min))
+                # self.l_clim_max.setText(str(max))
 
-            # for widgets in self.widgets_array:
-            #     for widget in widgets:
-            #         widget.setEnabled(True)
+                # for widgets in self.widgets_array:
+                #     for widget in widgets:
+                #         widget.setEnabled(True)
+            if filename[0].split('.')[-1] in ['fil']:
+                # Load file
+                self.loaded_cube = Waterfall(filename[0], max_load=5.5, load_data=False)
+                self.loaded_cube.read_data(f_start=None, f_stop=None, t_start=0, t_stop=10 * 12500 + 1024)
+                print (self.loaded_cube.data.shape)
+                self.loaded_cube.data = self.clean_data(np.swapaxes(np.swapaxes(self.loaded_cube.data, 0, 2), 1, 2)[:,:,0])
+                self.loaded_cube.data = np.expand_dims(np.fliplr(np.swapaxes(self.loaded_cube.data, 0, 1)), axis=2)
+                # median = np.median(self.loaded_cube.data)
+                # std = np.std(self.loaded_cube.data)
+                # mask = np.abs(self.loaded_cube.data - median) > (2.698*std)
+                #
+                # print ("mask", mask)
+
+                # from astropy import visualization
+                # stretch = visualization.AsinhStretch(0.01) + visualization.MinMaxInterval()
+                # self.loaded_cube.data = stretch(self.loaded_cube.data)
+
+                try:
+                    self.vol_min = self.loaded_cube.header["DATAMIN"]
+                    self.vol_max = self.loaded_cube.header["DATAMAX"]
+                except:
+                    self.vol_min = np.nanmin(self.loaded_cube.data)
+                    self.vol_max = np.nanmax(self.loaded_cube.data)
 
             self.signal_file_loaded.emit()
             # self.signal_objet_changed.emit()
@@ -1161,61 +1258,66 @@ class Canvas3D(scene.SceneCanvas):
                                        border_color='#404040', bgcolor="#404040")
 
         try:
+            cube = cube[0]
+        except:
+            pass
+
+        try:
             # Quick fix -- will need to be a bit more clever.
-            # print cube[0].data.shape
-            # if len(cube[0].data.shape) == 4:
+            # print cube.data.shape
+            # if len(cube.data.shape) == 4:
             #     # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-            #     data = cube[0].data[0][:2048,:2048,:2048]
-            #     self.clim_vel = 0, cube[0].data[0].shape[0]
+            #     data = cube.data[0][:2048,:2048,:2048]
+            #     self.clim_vel = 0, cube.data[0].shape[0]
             # else:
             #     # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-            #     data = cube[0].data[:2048,:2048,:2048]
-            #     self.clim_vel = 0, cube[0].data.shape[0]
+            #     data = cube.data[:2048,:2048,:2048]
+            #     self.clim_vel = 0, cube.data.shape[0]
             #
             # try:
-            #     self.bunit = cube[0].header['BUNIT']
+            #     self.bunit = cube.header['BUNIT']
             # except:
             #     self.bunit = "unknown"
             #
             # try:
-            #     self.vel = cube[0].header['CTYPE3']
+            #     self.vel = cube.header['CTYPE3']
             # except:
             #     self.vel = "unknown"
 
-            # print(cube[0].data.shape)
-            if len(cube[0].data.shape) == 4:
+            # print(cube.data.shape)
+            if len(cube.data.shape) == 4:
                 # Test
-                # cube[0].data = np.swapaxes(cube[0].data, 0, 1)
+                # cube.data = np.swapaxes(cube.data, 0, 1)
 
 
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-                data = cube[0].data[0][:2048, :2048, :2048]
-                # data = cube[0].data[0][75:150, 110:150, 100:150]
+                data = cube.data[0][:2048, :2048, :2048]
+                # data = cube.data[0][75:150, 110:150, 100:150]
 
-                self.vel_axis = cube[0].data[0].shape[0]
+                self.vel_axis = cube.data[0].shape[0]
             else:
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-                data = cube[0].data[:2048, :2048, :2048]
-                # data = cube[0].data[:,60:-60,:]
-                # data = cube[0].data[:, :, :]
-                self.vel_axis = cube[0].data.shape[0]
+                data = cube.data[:2048, :2048, :2048]
+                # data = cube.data[:,60:-60,:]
+                # data = cube.data[:, :, :]
+                self.vel_axis = cube.data.shape[0]
 
             try:
-                self.bunit = cube[0].header['BUNIT']
+                self.bunit = cube.header['BUNIT']
             except:
                 self.bunit = "unknown"
 
             try:
-                self.vel_type = cube[0].header['CTYPE3']
+                self.vel_type = cube.header['CTYPE3']
             except:
                 self.vel_type = "Epoch"
 
             try:
                 # TODO: Possibly use astropy's wcs module for all of this.
-                self.vel_val = cube[0].header['CRVAL3']
+                self.vel_val = cube.header['CRVAL3']
                 lim_is_set = False
                 try:
-                    self.vel_delt = cube[0].header['CDELT3']
+                    self.vel_delt = cube.header['CDELT3']
                     set_lim = True
                 except:
                     # print("No CDELT3 card in header.")
@@ -1231,21 +1333,21 @@ class Canvas3D(scene.SceneCanvas):
                         lim_is_set = True
 
                 elif self.vel_type == 'FREQ':
-                    if cube[0].header['CUNIT3'] == 'Hz':
-                        self.vel_type += ' (T' + cube[0].header['CUNIT3'] + ')'  # Hz to THz
+                    if cube.header['CUNIT3'] == 'Hz':
+                        self.vel_type += ' (T' + cube.header['CUNIT3'] + ')'  # Hz to THz
                         self.clim_vel = float(self.vel_val) / (1000 * 1000 * 1000), \
                                         (float(self.vel_val) + float(self.vel_delt) * self.vel_axis) / (
                                         1000 * 1000 * 1000)
                         lim_is_set = True
                     else:
-                        self.vel_type += ' (' + cube[0].header['CUNIT3'] + ')'
+                        self.vel_type += ' (' + cube.header['CUNIT3'] + ')'
                         self.clim_vel = np.int(np.round(float(self.vel_val))), \
                                         np.int(np.round((float(self.vel_val) +
                                                          float(self.vel_delt) *
                                                          self.vel_axis)))
                         lim_is_set = True
                 elif self.vel_type == 'WAVE':
-                    self.vel_type += ' (' + cube[0].header['CUNIT3'] + ')'
+                    self.vel_type += ' (' + cube.header['CUNIT3'] + ')'
 
                 if set_lim == True and lim_is_set == False:
                     self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round((float(self.vel_val) +
@@ -1255,7 +1357,7 @@ class Canvas3D(scene.SceneCanvas):
 
                 if set_lim == False:
                     try:
-                        self.vel_delt = cube[0].header['STEP']
+                        self.vel_delt = cube.header['STEP']
                         self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round((float(self.vel_val) +
                                                                                                 float(self.vel_delt) *
                                                                                                 self.vel_axis)))
@@ -1447,7 +1549,9 @@ class Canvas3D(scene.SceneCanvas):
         elif (self.volume.color_method == 2):
             self.cbar_left.visible = False
             self.show_colorbar = False
-
+        elif (self.volume.color_method == 3):
+            self.cbar_left.visible = False
+            self.show_colorbar = False
         else:
             label = str(self.vel_type)
             clim = self.clim_vel

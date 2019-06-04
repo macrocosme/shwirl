@@ -106,8 +106,8 @@ uniform int u_gaussian_filter_size;
 //uniform int u_log_scale;
 
 // Volume Stats
-//uniform float u_volume_mean;
-//uniform float u_volume_std;
+uniform float u_volume_mean;
+uniform float u_volume_std;
 //uniform float u_volume_madfm;
 uniform float u_high_discard_filter_value;
 uniform float u_low_discard_filter_value;
@@ -326,8 +326,8 @@ void main() {{
                             (u_shape.x - 0.5 - v_position.x) / view_ray.x));
     distance = max(distance, min((-0.5 - v_position.y) / view_ray.y,
                             (u_shape.y - 0.5 - v_position.y) / view_ray.y));
-    distance = max(distance, min((-0.5 - v_position.z) / view_ray.z,
-                            (u_shape.z - 0.5 - v_position.z) / view_ray.z));
+    //distance = max(distance, min((-0.5 - v_position.z) / view_ray.z,
+    //                        (u_shape.z - 0.5 - v_position.z) / view_ray.z));
 
     // Now we have the starting position on the front surface
     vec3 front = v_position + view_ray * distance;
@@ -509,32 +509,53 @@ MIP_SNIPPETS = dict(
         }}
 
         // Color is associated to voxel intensity
-        if (u_color_method == 0) {
+        // Moment 0
+        if (u_color_method == 0) {  
             gl_FragColor = $cmap(maxval);
-            //gl_FragColor.a = maxval;
+        } 
+        // Moment 1 
+        else if (u_color_method == 1) {
+            
+            gl_FragColor = $cmap(loc.y);
+            gl_FragColor.a = maxval;
+        } 
+        // Color is associated to RGB cube
+        else if (u_color_method == 2) {
+            gl_FragColor.r = loc.y;
+            gl_FragColor.g = loc.z;
+            gl_FragColor.b = loc.x;
+            gl_FragColor.a = maxval;
+        } 
+        // Color by sigma values
+        else if (u_color_method == 3) {
+            
+            if ( (maxval < (u_volume_mean + (3.0 * u_volume_std)))  ) 
+            {
+                gl_FragColor =  vec4(0., 0., 1., maxval);
+            }
+            
+            // < 3 sigmas
+            if ( (maxval >= (u_volume_mean + (3.0 * u_volume_std))) && 
+                 (maxval < (u_volume_mean + (4.0 * u_volume_std))) )  
+            {
+                gl_FragColor =  vec4(0., 1., 0., maxval);
+            }
+            
+            if ( (maxval >= (u_volume_mean + (4.0 * u_volume_std))) && 
+                 (maxval < (u_volume_mean + (5.0 * u_volume_std))) )  
+            {
+                gl_FragColor =  vec4(1., 0., 0., maxval);
+            }
+            
+            if ( (maxval >= (u_volume_mean + (5.0 * u_volume_std))) )  
+            {
+                gl_FragColor =  vec4(1., 1., 1., maxval);
+            }
         }
-        else{
-            // Color is associated to redshift/velocity
-            if (u_color_method == 1) {
-                gl_FragColor = $cmap(loc.y);
-
-                //if (maxval == 0)
-                    gl_FragColor.a = maxval;
-            }
-            // Color is associated to RGB cube
-            else {
-                if (u_color_method == 2) {
-                    gl_FragColor.r = loc.y;
-                    gl_FragColor.g = loc.z;
-                    gl_FragColor.b = loc.x;
-                    gl_FragColor.a = maxval;
-                }
-                // Case 4: Mom2
-                // TODO: verify implementation of MIP-mom2.
-                else {
-                   gl_FragColor = $cmap((maxval * ((maxval - loc.y) * (maxval - loc.y))) / maxval);
-                }
-            }
+        else {
+            // Moment 2
+            // TODO: verify implementation of MIP-mom2.
+            gl_FragColor = $cmap((maxval * ((maxval - loc.y) * (maxval - loc.y))) / maxval);
         }
 
         """,
@@ -1012,17 +1033,16 @@ class RenderVolumeVisual(Visual):
         self.high_discard_filter_value = self._clim[1]
         self.low_discard_filter_value = self._clim[0]
 
-        # self.volume_mean = np.mean(vol)
-        # self.volume_std = np.std(vol)
-        # self.volume_madfm = self.madfm(vol)
+        self.volume_mean = np.mean(vol)
+        self.volume_std = np.std(vol)
+        #self.volume_madfm = self.madfm(vol)
 
         # Apply to texture
+        print ("min:", np.min(vol), "max:", np.max(vol))
         self._tex.set_data(vol)  # will be efficient if vol is same shape
-        self.shared_program['u_shape'] = (vol.shape[2], vol.shape[1],
-                                          vol.shape[0])
+        self.shared_program['u_shape'] = (vol.shape[2], vol.shape[1], vol.shape[0])
 
-        self.shared_program['u_resolution'] = (1/vol.shape[2], 1/vol.shape[1],
-                                          1/vol.shape[0])
+        self.shared_program['u_resolution'] = (1/vol.shape[2], 1/vol.shape[1], 1/vol.shape[0])
 
         shape = vol.shape[:3]
         if self._vol_shape != shape:
@@ -1117,8 +1137,10 @@ class RenderVolumeVisual(Visual):
             self._color_method = 1
         elif color_method == 'rgb_cube':
             self._color_method = 2
-        else:
+        elif color_method == 'Sigmas':
             self._color_method = 3
+        else:
+            self._color_method = 4
 
         # print ("color_method", self._color_method)
         self.shared_program['u_color_method'] = int(self._color_method)
@@ -1201,11 +1223,8 @@ class RenderVolumeVisual(Visual):
     @volume_mean.setter
     def volume_mean(self, volume_mean):
         self._volume_mean = float(volume_mean)
-        # Scale to [0,1]
-        self._volume_mean -= self._clim[0]
-        self._volume_mean /= self._clim[1] - self._clim[0]
         self.shared_program['u_volume_mean'] = self._volume_mean
-        # print ("self._volume_mean", self._volume_mean)
+        print ("self._volume_mean", self._volume_mean)
         self.update()
 
     @property
@@ -1215,9 +1234,8 @@ class RenderVolumeVisual(Visual):
     @volume_std.setter
     def volume_std(self, volume_std):
         self._volume_std = float(volume_std)
-        self._volume_std -= self._clim[0]
-        self._volume_std /= self._clim[1] - self._clim[0]
         self.shared_program['u_volume_std'] = self._volume_std
+        print("self._volume_std", self._volume_std)
         self.update()
 
     @property
