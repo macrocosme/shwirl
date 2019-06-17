@@ -1236,29 +1236,8 @@ class Canvas3D(scene.SceneCanvas):
 
         try:
             # Quick fix -- will need to be a bit more clever.
-            # print cube.data.shape
-            # if len(cube.data.shape) == 4:
-            #     # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-            #     data = cube.data[0][:2048,:2048,:2048]
-            #     self.clim_vel = 0, cube.data[0].shape[0]
-            # else:
-            #     # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-            #     data = cube.data[:2048,:2048,:2048]
-            #     self.clim_vel = 0, cube.data.shape[0]
-            #
-            # try:
-            #     self.bunit = cube.header['BUNIT']
-            # except:
-            #     self.bunit = "unknown"
-            #
-            # try:
-            #     self.vel = cube.header['CTYPE3']
-            # except:
-            #     self.vel = "unknown"
-
             self.parse_header_info_for_axes_labels(cube)
 
-            # print(cube.data.shape)
             if len(cube.data.shape) == 4:
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
                 data = cube.data[0][:2048, :2048, :2048]
@@ -1334,11 +1313,8 @@ class Canvas3D(scene.SceneCanvas):
                     except:
                         self.clim_vel = 0, self.vel_axis
 
-                # print("self.clim_vel", self.clim_vel)
-
             except:
                 self.vel_val = "Undefined"
-                # print("self.clim_vel", self.clim_vel)
 
             data = np.flipud(np.rollaxis(data, 1))
 
@@ -1346,21 +1322,6 @@ class Canvas3D(scene.SceneCanvas):
                                        parent=self.view.scene,
                                        threshold=0.225,
                                        emulate_texture=False)
-            # clim=[clim_min, clim_max])
-
-            # Add a mesh to simulate a box around the volume rendering. Acts as 3D axis.
-            # Should eventually add measurements taken from fits header (RA, DEC...).
-            # vertices, filled_indices, outline_indices = self.create_cube(data.shape)
-            # self.axis = scene.visuals.Mesh(vertices['position'],
-            #                                outline_indices,
-            #                                color="white",
-            #                                parent=self.view.scene,
-            #                                mode='lines')
-            #
-            # from shwirl.extern.vispy.gloo import gl
-            # gl.glLineWidth(1.5)
-            #
-            # self.view.add(self.axis)
 
             # %%%%%%%%%%%%%%%%%%%%%%%%%%
             # Axes labels
@@ -1401,15 +1362,14 @@ class Canvas3D(scene.SceneCanvas):
 
             # Cheat to make the box width bigger.
             #
-            # pos = np.array([[0, 0, 0], [1, 1, 1]])
-            # self.line = scene.Line(pos=pos,
-            #                   color='green',
-            #                   method='gl',
-            #                   width=2,
-            #                   connect='strip',
-            #                   parent=self.view.scene)
-            # self.line.antialias = 1
-
+            pos = np.array([[0, 0, 0], [1, 1, 1]])
+            self.line = scene.Line(pos=pos,
+                              color='green',
+                              method='gl',
+                              width=2,
+                              connect='strip',
+                              parent=self.view.scene)
+            self.line.antialias = 1
 
             # Add colorbar
             self.colorbar(label=str(self.vel_type),
