@@ -1,5 +1,3 @@
-![alt text](docs/_static/shwirl_splash.png "Shwirl")
-
 <a href="http://ascl.net/1704.003"><img src="https://img.shields.io/badge/ascl-1704.003-blue.svg?colorB=262255" alt="ascl:1704.003" /></a><a href='http://shwirl.readthedocs.io/en/latest/?badge=latest'>
     <img src='https://readthedocs.org/projects/shwirl/badge/?version=latest' alt='Documentation Status' />
 </a>[![astropy](http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](http://www.astropy.org/)
