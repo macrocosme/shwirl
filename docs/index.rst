@@ -6,6 +6,8 @@
 Index
 =====
 
+.. image:: _static/shwirl_splash.png
+
 .. image:: https://img.shields.io/badge/ascl-1704.003-blue.svg?colorB=262255
    :target: http://ascl.net/1704.003
    :alt: ascl:1704.003
