@@ -16,9 +16,10 @@ from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import *
 
 # Vispy imports
-from .extern.vispy import app, io, scene
-from .extern.vispy.color import get_colormaps
-from .extern.vispy.gloo import gl
+from vispy import app, io, scene
+from vispy.color import get_colormaps
+from vispy.gloo import gl
+
 from .shaders import RenderVolume
 from .shaders.axes import AxesVisual3D
 

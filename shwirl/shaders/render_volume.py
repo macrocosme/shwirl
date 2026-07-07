@@ -42,12 +42,11 @@
 #
 
 import numpy as np
-
-from ..extern.vispy.color import get_colormap
-from ..extern.vispy.gloo import IndexBuffer, Texture3D, TextureEmulated3D, VertexBuffer
-from ..extern.vispy.scene.visuals import create_visual_node
-from ..extern.vispy.visuals import Visual
-from ..extern.vispy.visuals.shaders import Function
+from vispy.color import get_colormap
+from vispy.gloo import IndexBuffer, Texture3D, TextureEmulated3D, VertexBuffer
+from vispy.scene.visuals import create_visual_node
+from vispy.visuals import Visual
+from vispy.visuals.shaders import Function
 
 # Vertex shader
 VERT_SHADER = """

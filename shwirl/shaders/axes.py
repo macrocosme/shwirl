@@ -2,11 +2,10 @@
 # TODO: Need to include license...
 
 import numpy as np
+from vispy import scene
 
-from ..extern.vispy import scene
-
-# from ..extern.vispy.geometry import create_cube
-from ..extern.vispy.visuals.transforms import ChainTransform, STTransform
+# from vispy.geometry import create_cube
+from vispy.visuals.transforms import ChainTransform, STTransform
 
 
 class AxesVisual3D:
