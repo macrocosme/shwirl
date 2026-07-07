@@ -8,15 +8,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Run / build / test
 
+Modernization is underway on branch `macrocosme/modernize` (Python 3.10+, PySide6,
+`pyproject.toml`). Dev environment uses a `.venv` (created with `uv`):
+
 ```bash
-pip install -e .          # editable install (setup.py based; no pyproject.toml)
-shwirl                    # launch GUI (console_scripts entry point → shwirl.shwirl:main)
-python main.py            # NOTE: currently broken — see Known breakage below
+uv venv --python 3.12 .venv
+uv pip install -e ".[dev]"          # core + pytest/ruff; add ",filterbank" for .fil support
+.venv/bin/shwirl                    # launch GUI (entry point → shwirl.shwirl:main)
+
+ruff check .                        # lint (config in pyproject; excludes shwirl/extern)
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest   # headless tests
 ```
 
-- **No test suite** exists (`shwirl/tests/__init__.py` is empty) and **no CI/CD**.
-- **No linter/formatter** configured.
+- Packaging is `pyproject.toml` (setuptools backend); the old `setup.py` is archived at
+  `archive/setup.py.legacy`. Version is `0.2.0`.
+- Tests live in `shwirl/tests/` (shader generation + import smoke tests). CI is
+  `.github/workflows/ci.yml` (ruff + pytest on macOS/Linux × Py3.10–3.12).
+- `blimpy` is an **optional** `[filterbank]` extra, imported lazily (only for `.fil` files).
+  It still imports the removed `pkg_resources`, hence the `setuptools<81` pin in that extra.
 - Docs are Sphinx (`docs/`, `make html`) published to readthedocs.
+
+### ⚠️ Known blocker (Phase 3, open decision)
+The app **imports** cleanly on Py3.12/PySide6/Apple Silicon but does **not launch yet**:
+vendored VisPy 0.5.0's Qt backend (`shwirl/extern/vispy/app/backends/_qt.py`) is built on
+`QGLWidget`/`QGLFormat` from Qt's old `QtOpenGL` module, both **removed in Qt6/PySide6**
+(replaced by `QOpenGLWidget` + `QSurfaceFormat`). Also, VisPy 0.5.0's backend registry has
+no PySide6/PyQt6 entry. Resolving this is the un-vendor-vs-port-the-fork decision.
 
 ## Architecture
 
@@ -31,19 +48,22 @@ Data flow: `MainWindow` builds a VisPy `SceneCanvas`, instantiates `RenderVolume
 
 ### Vendored VisPy — important
 
-`shwirl/extern/vispy/` is a **patched fork of VisPy (~370 files, 6 MB), not pip-installed upstream.** Imports throughout the code are relative (`from .extern.vispy import app, scene, io`). `setup.py` enumerates every vendored subpackage by hand. Treat this as the biggest modernization liability: it pins the project to an old OpenGL-era VisPy. Do not casually "upgrade" individual files inside it; changes there interact with the custom shaders.
+`shwirl/extern/vispy/` is a **patched fork of VisPy 0.5.0.dev0 (~370 files, 6 MB), not pip-installed upstream.** Imports throughout the code are relative (`from .extern.vispy import app, scene, io`). Current upstream is 0.14.x. After the initial vendoring, only 2 source files were patched by the author (`visuals/colorbar.py`, `visuals/isocurve.py`); the custom rendering work lives *outside* the fork in `shwirl/shaders/`. Modernization has since added Py3.12/arm64 fixes inside the fork (`ext/cocoapy.py`, `geometry/torusknot.py`). Do not casually "upgrade" individual files inside it; changes there interact with the custom shaders.
 
-## Legacy / modernization context
+## Modernization status (branch `macrocosme/modernize`)
 
-This code was last touched ~7 years ago and straddles Python 2/3:
-- `from __future__ import division`, a `six` dependency, and a `PyQt4` import fallback.
-- `setup.py` classifiers still advertise Python 2.7–3.6; packaging is legacy setuptools (no `pyproject.toml`).
-- Stray `print(...)` debug statements remain in `shwirl.py`.
+**Done:** pyproject/CI/tests/hygiene; Python 3.10+ cleanup (dropped `__future__`/`six`/PyQt4
+fallback/debug prints); PyQt5→**PySide6** migration; fixed the broken entry point; blimpy made
+an optional lazy `[filterbank]` extra; vendored-vispy fixes so it **imports** on Py3.12 + Apple
+Silicon (arm64 `_stret` guards, `math.gcd`).
 
-### Known breakage
-- `shwirl/__init__.py` defines `main()` as `from shwirl import main; main()` — a self-referential no-op. `main.py` at repo root calls `shwirl.main()` and will not work. The functioning entry point is `shwirl.shwirl:main` (the `shwirl` console script).
-- `blimpy` is imported by `shwirl.py` but is **missing from `install_requires`** (which lists scipy, numpy, astropy, PyOpenGL, six).
-- OpenGL is deprecated on macOS; runtime viability on modern Linux/macOS is unverified.
+**Remaining:**
+- **Phase 3 (blocked on decision):** the VisPy↔Qt6 OpenGL gap — see "Known blocker" above.
+  Two paths: (A) port the fork's `_qt.py` backend to Qt6 `QOpenGLWidget` + add `_pyside6.py`;
+  (B) un-vendor onto modern VisPy 0.14 (native PySide6) and forward-port the custom
+  `RenderVolumeVisual`/`AxesVisual3D`. A fast fallback is reverting the Qt choice to PyQt5,
+  whose `QtOpenGL.QGLWidget` still exists (but Qt5 is EOL / QGLWidget deprecated).
+- **Phase 5:** PyPI re-release once it launches.
 
 ## Repo conventions
 
