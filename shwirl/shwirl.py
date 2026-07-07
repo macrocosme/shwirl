@@ -1,42 +1,27 @@
-# -*- coding: utf-8 -*-
-from __future__ import division
 
 # Basic imports
 import sys
+from pathlib import Path
+
 import numpy as np
 
+# Astropy imports
+from astropy.io import fits
+
+# Qt imports (PySide6)
+from PySide6 import QtCore
+from PySide6.QtCore import Qt
+from PySide6.QtCore import Signal as pyqtSignal
+from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtWidgets import *
+
 # Vispy imports
-from .extern.vispy import app, scene, io
+from .extern.vispy import app, io, scene
 from .extern.vispy.color import get_colormaps
 from .extern.vispy.gloo import gl
 from .shaders import RenderVolume
 from .shaders.axes import AxesVisual3D
-# Astropy imports
-from astropy.io import fits
-from blimpy import Waterfall
 
-# PyQt5 imports
-try:
-    from PyQt5 import QtGui, QtCore, QtWidgets
-    from PyQt5.QtWidgets import *
-    from PyQt5.QtGui import QColor, QPixmap
-    from PyQt5.QtCore import Qt, pyqtSignal
-except:
-    try:
-        try:
-            from sip import setapi
-
-            setapi("QVariant", 2)
-            setapi("QString", 2)
-        except ImportError:
-            pass
-
-        from PyQt4 import QtGui, QtCore
-        from PyQt4.QtCore import Qt, pyqtSignal
-        from PyQt4.QtGui import *
-    except:
-        print ("Requires PyQt5 or PyQt4. None found.")
-        exit()
 
 class MainWindow(QMainWindow):
     """MainWindow class.
@@ -119,7 +104,7 @@ class MainWindow(QMainWindow):
         self.props['filtering'].signal_low_discard_filter_changed.connect(self.update_low_discard_filter)
         self.props['image'].signal_export_image.connect(self.export_image)
 
-        QApplication.setStyle(QStyleFactory.create('Cleanlooks'))
+        QApplication.setStyle(QStyleFactory.create('Fusion'))
 
     def keyPressEvent(self, e):
         """Handle the event where a key is pressed.
@@ -130,7 +115,6 @@ class MainWindow(QMainWindow):
 
         """
         if e.key() == QtCore.Qt.Key_Escape:
-            print ("blabla")
             self.app.quit()
 
     def load_volume(self):
@@ -144,7 +128,7 @@ class MainWindow(QMainWindow):
         self.Canvas3D.set_volume_scene(self.props['load_button'].loaded_cube)
         try:
             self.fits_infos.print_header(self.props['load_button'].loaded_cube[0].header, 'fits')
-        except:
+        except Exception:
             # This is shady. The type should be properly assessed.
             self.fits_infos.print_header(self.props['load_button'].loaded_cube.header, 'filterbank')
             pass
@@ -287,7 +271,7 @@ class FitsMetaWidget(QWidget):
     def __init__(self, parent=None):
         """Initialise the layout, including QTextEdit widget.
         """
-        super(FitsMetaWidget, self).__init__(parent)
+        super().__init__(parent)
 
         l_title = QLabel("Fits Primary Header")
 
@@ -331,9 +315,9 @@ class FitsMetaWidget(QWidget):
             self.l_header.insertPlainText('card\t\tvalue\n')
             for key in header.keys():
                 self.l_header.setTextColor(QColor('blue'))
-                self.l_header.insertPlainText("%s\t\t" % (key))
+                self.l_header.insertPlainText(f"{key}\t\t")
                 self.l_header.setTextColor(QColor('black'))
-                self.l_header.insertPlainText("%s\n" % (str(header[key])))
+                self.l_header.insertPlainText(f"{str(header[key])}\n")
 
 
         sb = self.l_header.verticalScrollBar()
@@ -372,7 +356,7 @@ class ObjectWidget(QWidget):
             parent : class
                 Parent class.
         """
-        super(ObjectWidget, self).__init__(parent)
+        super().__init__(parent)
 
         self.loaded_cube = None
 
@@ -397,7 +381,7 @@ class ObjectWidget(QWidget):
             self.widgets_dict[key] = array
             try:
                 self.widgets_group_dict[group].append([key, array])
-            except:
+            except Exception:
                 self.widgets_group_array.append(group)
                 self.widgets_group_dict[group] = []
                 self.widgets_group_dict[group].append([key, array])
@@ -696,9 +680,6 @@ class ObjectWidget(QWidget):
         cleaned filterbank object
         """
         # Clean in time
-        print (type(data))
-        print(data.shape)
-
         if clean_type in ['time', 'both']:
             for i in range(n_iter_time):
                 dfmean = np.mean(data, axis=0)
@@ -747,7 +728,7 @@ class ObjectWidget(QWidget):
 
                     # print("DATAMIN", self.vol_min)
                     # print("DATAMAX", self.vol_max)
-                except:
+                except Exception:
                     # print("Warning: DATAMIN and DATAMAX not present in header; evaluating min and max")
                     if self.loaded_cube[0].header["NAXIS"] == 3:
                         self.vol_min = np.nanmin(self.loaded_cube[0].data)
@@ -764,10 +745,19 @@ class ObjectWidget(QWidget):
                 #     for widget in widgets:
                 #         widget.setEnabled(True)
             if filename[0].split('.')[-1] in ['fil']:
-                # Load file
+                # Load file. blimpy is an optional dependency, only required for
+                # filterbank (.fil) files; import lazily so the core app and
+                # FITS loading work without it (install with: pip install
+                # "shwirl[filterbank]").
+                try:
+                    from blimpy import Waterfall
+                except ImportError as exc:
+                    raise ImportError(
+                        "Reading filterbank (.fil) files requires blimpy. "
+                        "Install it with: pip install 'shwirl[filterbank]'"
+                    ) from exc
                 self.loaded_cube = Waterfall(filename[0], max_load=5.5, load_data=False)
                 self.loaded_cube.read_data(f_start=None, f_stop=None, t_start=0, t_stop=10 * 12500 + 1024)
-                print (self.loaded_cube.data.shape)
                 self.loaded_cube.data = self.clean_data(np.swapaxes(np.swapaxes(self.loaded_cube.data, 0, 2), 1, 2)[:,:,0])
                 self.loaded_cube.data = np.expand_dims(np.fliplr(np.swapaxes(self.loaded_cube.data, 0, 1)), axis=2)
                 # median = np.median(self.loaded_cube.data)
@@ -783,7 +773,7 @@ class ObjectWidget(QWidget):
                 try:
                     self.vol_min = self.loaded_cube.header["DATAMIN"]
                     self.vol_max = self.loaded_cube.header["DATAMAX"]
-                except:
+                except Exception:
                     self.vol_min = np.nanmin(self.loaded_cube.data)
                     self.vol_max = np.nanmax(self.loaded_cube.data)
 
@@ -804,7 +794,7 @@ class ObjectWidget(QWidget):
         try:
             self.l_high_discard_filter_value.setText(self.format_digits(self.vol_max))
             self.l_low_discard_filter_value.setText(self.format_digits(self.vol_min))
-        except:
+        except Exception:
             pass
 
     def enable_widgets(self):
@@ -824,7 +814,7 @@ class ObjectWidget(QWidget):
         if isinstance(value, int):
             return str(value)
         else:
-            return "{:.4f}".format(value)
+            return f"{value:.4f}"
 
     def update_view(self):
         """Update view.
@@ -923,7 +913,7 @@ class ObjectWidget(QWidget):
         if isinstance(self.high_scaled_value, int):
             self.l_high_discard_filter_value.setText(str(self.high_scaled_value))
         else:
-            self.l_high_discard_filter_value.setText("{:.4f}".format(self.high_scaled_value))
+            self.l_high_discard_filter_value.setText(f"{self.high_scaled_value:.4f}")
 
         self.signal_high_discard_filter_changed.emit()
 
@@ -944,7 +934,7 @@ class ObjectWidget(QWidget):
         if isinstance(self.l_low_discard_filter_value, int):
             self.l_low_discard_filter_value.setText(str(self.low_scaled_value))
         else:
-            self.l_low_discard_filter_value.setText("{:.4f}".format(self.low_scaled_value))
+            self.l_low_discard_filter_value.setText(f"{self.low_scaled_value:.4f}")
 
         self.signal_low_discard_filter_changed.emit()
 
@@ -1223,7 +1213,7 @@ class Canvas3D(scene.SceneCanvas):
         """
         # Set up a viewbox to display the image with interactive pan/zoom
         if self.view:
-            canvas = self.central_widget.remove_widget(self.grid)
+            self.central_widget.remove_widget(self.grid)
             self._configure_canvas()
 
         self.unfreeze()
@@ -1231,7 +1221,7 @@ class Canvas3D(scene.SceneCanvas):
 
         try:
             cube = cube[0]
-        except:
+        except Exception:
             pass
 
         try:
@@ -1245,7 +1235,6 @@ class Canvas3D(scene.SceneCanvas):
                 self.vel_axis = cube.data[0].shape[0]
             else:
                 # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-                print (cube.shape)
                 data = cube.data[:2048, :2048, :2048]
                 # data = cube.data[:,60:-60,:]
                 # data = cube.data[:, :, :]
@@ -1253,12 +1242,12 @@ class Canvas3D(scene.SceneCanvas):
 
             try:
                 self.bunit = cube.header['BUNIT']
-            except:
+            except Exception:
                 self.bunit = "unknown"
 
             try:
                 self.vel_type = cube.header['CTYPE3']
-            except:
+            except Exception:
                 self.vel_type = "Epoch"
 
             try:
@@ -1268,7 +1257,7 @@ class Canvas3D(scene.SceneCanvas):
                 try:
                     self.vel_delt = cube.header['CDELT3']
                     set_lim = True
-                except:
+                except Exception:
                     # print("No CDELT3 card in header.")
                     set_lim = False
 
@@ -1291,29 +1280,29 @@ class Canvas3D(scene.SceneCanvas):
                     else:
                         self.vel_type += ' (' + cube.header['CUNIT3'] + ')'
                         self.clim_vel = np.int(np.round(float(self.vel_val))), \
-                                        np.int(np.round((float(self.vel_val) +
+                                        np.int(np.round(float(self.vel_val) +
                                                          float(self.vel_delt) *
-                                                         self.vel_axis)))
+                                                         self.vel_axis))
                         lim_is_set = True
                 elif self.vel_type == 'WAVE':
                     self.vel_type += ' (' + cube.header['CUNIT3'] + ')'
 
-                if set_lim == True and lim_is_set == False:
-                    self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round((float(self.vel_val) +
+                if set_lim and not lim_is_set:
+                    self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round(float(self.vel_val) +
                                                                                             float(self.vel_delt) *
-                                                                                            self.vel_axis)))
+                                                                                            self.vel_axis))
                     lim_is_set = True
 
-                if set_lim == False:
+                if not set_lim:
                     try:
                         self.vel_delt = cube.header['STEP']
-                        self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round((float(self.vel_val) +
+                        self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round(float(self.vel_val) +
                                                                                                 float(self.vel_delt) *
-                                                                                                self.vel_axis)))
-                    except:
+                                                                                                self.vel_axis))
+                    except Exception:
                         self.clim_vel = 0, self.vel_axis
 
-            except:
+            except Exception:
                 self.vel_val = "Undefined"
 
             data = np.flipud(np.rollaxis(data, 1))
@@ -1445,7 +1434,7 @@ class Canvas3D(scene.SceneCanvas):
         """
         try:
             threshold = float(threshold)
-        except:
+        except Exception:
             print("Threshold: needs to be a float")
             pass
 
@@ -1454,7 +1443,7 @@ class Canvas3D(scene.SceneCanvas):
             threshold /= self.volume.clim[1] - self.volume.clim[0]
             self.volume.threshold = threshold
             # print (self.volume.threshold)
-        except:
+        except Exception:
             print("Invalid threshold")
             pass
 
@@ -1612,7 +1601,7 @@ class Canvas3D(scene.SceneCanvas):
         flag : bool
             Should it autorotate or not. True: autorotate. False: will not autorotate
         """
-        if flag == True:
+        if flag:
             # self.set_camera("Perspectivecamera", 60)
             # self.timer.start(0.01, 100)
             self.timer.start(0.01)
@@ -1686,10 +1675,12 @@ class Canvas3D(scene.SceneCanvas):
 # -----------------------------------------------------------------------------
 def main():
     appQt = QApplication(sys.argv)
-    resolution = appQt.desktop().screenGeometry()
+    # High-DPI scaling is enabled by default in Qt6.
+    resolution = appQt.primaryScreen().geometry()
 
     # Create and display the splash screen
-    splash_pix = QPixmap('shwirl/images/splash_screen.png')
+    splash_path = Path(__file__).resolve().parent / 'images' / 'splash_screen.png'
+    splash_pix = QPixmap(str(splash_path))
     splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setMask(splash_pix.mask())
     splash.show()
@@ -1697,21 +1688,9 @@ def main():
 
     win = MainWindow(resolution)
     win.show()
-    appQt.exec_()
+    splash.finish(win)
+    appQt.exec()
+
 
 if __name__ == '__main__':
-    appQt = QApplication(sys.argv)
-    resolution = appQt.desktop().screenGeometry()
-    appQt.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-    appQt.setAttribute(QtCore.Qt.QT_AUTO_SCREEN_SCALE_FACTOR)
-
-    # Create and display the splash screen
-    splash_pix = QPixmap('shwirl/images/splash_screen.png')
-    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
-    splash.setMask(splash_pix.mask())
-    splash.show()
-    appQt.processEvents()
-
-    win = MainWindow(resolution)
-    win.show()
-    appQt.exec_()
+    main()

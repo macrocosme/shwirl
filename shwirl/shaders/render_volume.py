@@ -1,4 +1,3 @@
-from __future__ import division
 
 # This file implements a RenderVolumeVisual class. It is derived from the
 # VolumeVisual class in vispy.visuals.volume, which is released under a BSD
@@ -42,14 +41,13 @@ from __future__ import division
 # A copy of the license is available in the root directory of this project.
 #
 
-from ..extern.vispy.gloo import Texture3D, TextureEmulated3D, VertexBuffer, IndexBuffer
+import numpy as np
+
+from ..extern.vispy.color import get_colormap
+from ..extern.vispy.gloo import IndexBuffer, Texture3D, TextureEmulated3D, VertexBuffer
+from ..extern.vispy.scene.visuals import create_visual_node
 from ..extern.vispy.visuals import Visual
 from ..extern.vispy.visuals.shaders import Function
-from ..extern.vispy.color import get_colormap
-from ..extern.vispy.scene.visuals import create_visual_node
-from ..extern.vispy.io import load_spatial_filters
-
-import numpy as np
 
 # Vertex shader
 VERT_SHADER = """
@@ -1195,8 +1193,7 @@ class RenderVolumeVisual(Visual):
         # Check and save
         known_methods = list(frag_dict.keys())
         if method not in known_methods:
-            raise ValueError('Volume render method should be in %r, not %r' %
-                             (known_methods, method))
+            raise ValueError(f'Volume render method should be in {known_methods!r}, not {method!r}')
         self._method = method
         # Get rid of specific variables - they may become invalid
         if 'u_threshold' in self.shared_program:

@@ -1,12 +1,15 @@
 # Adapted from glue-vispy-viewer (https://github.com/glue-viz/glue-vispy-viewers)
 # TODO: Need to include license...
 
-from ..extern.vispy import scene
-# from ..extern.vispy.geometry import create_cube
-from ..extern.vispy.visuals.transforms import STTransform, ChainTransform
 import numpy as np
 
-class AxesVisual3D(object):
+from ..extern.vispy import scene
+
+# from ..extern.vispy.geometry import create_cube
+from ..extern.vispy.visuals.transforms import ChainTransform, STTransform
+
+
+class AxesVisual3D:
 
     def __init__(self, parent, data_shape, view=None, transform=None, tick_label_margin=40,
                  axis_label_margin=200, **kwargs):
