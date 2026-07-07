@@ -155,8 +155,12 @@ objc.class_getIvarLayout.argtypes = [c_void_p]
 objc.class_getMethodImplementation.restype = c_void_p
 objc.class_getMethodImplementation.argtypes = [c_void_p, c_void_p]
 
-objc.class_getMethodImplementation_stret.restype = c_void_p
-objc.class_getMethodImplementation_stret.argtypes = [c_void_p, c_void_p]
+# The struct-return (_stret) variants of the Objective-C runtime do not exist on
+# Apple Silicon (arm64), where struct returns use the indirect-result register
+# transparently. Only configure them when the symbol is actually present.
+if hasattr(objc, 'class_getMethodImplementation_stret'):
+    objc.class_getMethodImplementation_stret.restype = c_void_p
+    objc.class_getMethodImplementation_stret.argtypes = [c_void_p, c_void_p]
 
 objc.class_getName.restype = c_char_p
 objc.class_getName.argtypes = [c_void_p]
@@ -254,9 +258,12 @@ objc.objc_getMetaClass.argtypes = [c_char_p]
 objc.objc_getProtocol.restype = c_void_p
 objc.objc_getProtocol.argtypes = [c_char_p]
 
-objc.objc_msgSendSuper_stret.restype = None
+# _stret message-send variants are absent on Apple Silicon (arm64); guard them.
+if hasattr(objc, 'objc_msgSendSuper_stret'):
+    objc.objc_msgSendSuper_stret.restype = None
 
-objc.objc_msgSend_stret.restype = None
+if hasattr(objc, 'objc_msgSend_stret'):
+    objc.objc_msgSend_stret.restype = None
 
 objc.objc_registerClassPair.restype = None
 objc.objc_registerClassPair.argtypes = [c_void_p]
@@ -363,6 +370,11 @@ def get_superclass_of_object(obj):
 
 
 def x86_should_use_stret(restype):
+    # The _stret calling convention is x86-only. On arm64 (Apple Silicon) the
+    # symbol does not exist and struct returns go through the regular
+    # objc_msgSend, so never take this path.
+    if platform.machine() not in ('i386', 'x86_64'):
+        return False
     if type(restype) != type(Structure):
         return False
     if not __LP64__ and sizeof(restype) <= 8:

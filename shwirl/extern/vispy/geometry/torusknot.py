@@ -1,7 +1,10 @@
 from __future__ import division
 
 import numpy as np
-from fractions import gcd
+try:
+    from math import gcd  # Python 3.9+ (removed from fractions)
+except ImportError:  # pragma: no cover - Python < 3.5 fallback
+    from fractions import gcd
 
 
 class TorusKnot(object):
