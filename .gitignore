@@ -1,33 +1,52 @@
-# Compiled files
-[*/]*.py[cod]
-[*/]*.ipynb
-[*/]*.a
-[*/]*.o
-[*/]*.so
-[*/]*.pyd
-[*/]*.pyc
-[*/]*.xml
-[*/]*__pycache__
+# Byte-compiled / optimized / C extension
+__pycache__/
+*.py[cod]
+*.so
+*.a
+*.o
+*.c
+*.pyd
 
-[*/]*.c
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
 
-# Other
-[*/]*.cache
-[*/]*.tox
-[*/]*.*.swp
-[*/]*.*.swo
-[*/]**~
-[*/]*.project
-[*/]*.pydevproject
-[*/]*.settings
-[*/]*.coverage
-[*/]*cover
-[*/]*htmlcov
+# Virtual environments
+.venv/
+venv/
+env/
 
-# Mac OSX
+# Test / coverage
+.tox/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+*cover
+.pytest_cache/
+.ruff_cache/
+
+# Sphinx build output
+docs/_build/
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.project
+*.pydevproject
+*.settings
+
+# Notebooks
+*.ipynb_checkpoints/
+
+# macOS
 .DS_Store
 
-# PyCharm
-.idea
-
+# Misc
 *.pdf

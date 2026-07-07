@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 # shwirl documentation build configuration file, created by
 # sphinx-quickstart on Wed Mar 22 13:24:18 2017.
@@ -19,6 +18,7 @@
 #
 # import os
 import sys
+
 sys.path.insert(0, '../shwirl/')
 import sphinx_rtd_theme
 

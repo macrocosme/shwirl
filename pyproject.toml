@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shwirl"
+version = "0.2.0"
+description = "Meaningful colouring of spectral cube data with volume rendering"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "Dany Vohl", email = "danyvohl@gmail.com" }]
+keywords = ["visualisation", "astronomy", "spectral cubes", "volume rendering"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "astropy",
+    "PyOpenGL",
+    "PySide6",
+]
+
+[project.optional-dependencies]
+# blimpy is only needed to read filterbank (.fil) files. It still imports the
+# deprecated pkg_resources, which was removed from setuptools 81+, so pin
+# setuptools to a version that still provides it.
+filterbank = ["blimpy", "setuptools<81"]
+dev = ["pytest", "pytest-cov", "ruff"]
+
+[project.urls]
+Homepage = "https://github.com/macrocosme/shwirl"
+Documentation = "https://shwirl.readthedocs.io"
+Issues = "https://github.com/macrocosme/shwirl/issues"
+
+[project.scripts]
+shwirl = "shwirl.shwirl:main"
+
+[tool.setuptools.packages.find]
+include = ["shwirl*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.png", "*.glsl", "*.vert", "*.frag", "*.npy", "*.gz", "*.ttf", "*.json"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+# The vendored VisPy fork is third-party code; do not lint it.
+extend-exclude = ["shwirl/extern"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501", "F403", "F405"]
+
+[tool.ruff.lint.per-file-ignores]
+# render_volume.py embeds GLSL shader source as string literals; trailing
+# whitespace there is part of the shader text, not Python style.
+"shwirl/shaders/render_volume.py" = ["W291", "W293"]
+
+[tool.pytest.ini_options]
+testpaths = ["shwirl/tests"]
+addopts = "-ra"
