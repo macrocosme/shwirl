@@ -1,0 +1,30 @@
+name: shwirl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - scipy
+  - astropy
+  - vispy>=0.16
+  - pyside6
+  - pyopengl
+  # notebook / Python API niceties (shwirl.api: widget(), save_movie(), demo notebook)
+  - jupyterlab
+  - ipywidgets
+  - imageio
+  # optional, uncomment if wanted:
+  # - imageio-ffmpeg   # MP4 movie export
+  # - jupyter_rfb      # live mouse-rotatable canvas in notebooks (r.canvas())
+  # dev tooling
+  - pytest
+  - pytest-cov
+  - ruff
+  - pip
+  # The shwirl package itself (editable). blimpy (optional, for .fil files) is
+  # not reliably on conda-forge; install it with pip if you need filterbank
+  # support:  pip install "blimpy" "setuptools<81"
+  - pip:
+      # Deps above are already satisfied by conda-forge, so pip won't reinstall
+      # them; this just registers the shwirl package + `shwirl` console script.
+      - --editable .
