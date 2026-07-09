@@ -90,10 +90,16 @@ Fixed three NumPy-2/modern-VisPy render blockers that stopped real cubes drawing
 collision for texture-based colormaps like `hsl`). Real FITS cubes now render (verified with a
 live GL context).
 
+**Linux (headless) verified 2026-07-09:** branch pushed; first-ever CI run surfaced two
+issues, both fixed — ubuntu runners need Qt6 system libs (`libegl1 libgl1 libxkbcommon*
+libdbus-1-3 libfontconfig1 libglib2.0-0 libopengl0`) via an apt step even for the offscreen
+platform, and newer ruff lints `.ipynb` by default (now excluded). **CI fully green:
+lint + ubuntu/macos × Py3.10–3.12.**
+
 **Remaining:**
-- **Linux parity:** prep/verify on Linux (CI covers import+lint+headless tests; GL render is
-  opt-in). Windows later.
-- **Phase 5:** PyPI re-release (bump/tag, build sdist+wheel, publish).
+- **Linux live-GL check:** only the opt-in GL render path (`SHWIRL_GL_TESTS=1`) is unverified
+  on a real Linux display/GPU. Windows later.
+- **Phase 5:** PyPI re-release (bump/tag, build sdist+wheel, publish); PR modernize→master.
 - Optional: refresh Sphinx docs/readthedocs; fix the `get_interpolation_fun` dead code.
 
 ## Repo conventions
