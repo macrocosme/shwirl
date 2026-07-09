@@ -4,6 +4,11 @@ Future work / deferred items. Newest context at top.
 
 ## New items (2026-07-08)
 
+- [ ] **Multi-channel voxel colouring (RGB composite).** New shader mode colouring
+      voxels by 3-channel data (e.g. three co-registered cubes → RGB): needs an
+      RGB 3D texture + frag branch in `render_volume.py` (current texture is
+      single-channel `.g`). Useful for multi-line/multi-quantity overlays.
+
 - [x] **Python API + Jupyter integration** — done (`shwirl/api.py`, `[notebook]`
       extra, `examples/shwirl_api_demo.ipynb`). Follow-ups:
       - [ ] README + PyPI blurb showcasing the API (screenshot/GIF from the notebook)
