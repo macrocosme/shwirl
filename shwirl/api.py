@@ -18,6 +18,9 @@ imageio) for ``widget()``/``save_movie()``; ``imageio-ffmpeg`` for MP4;
 ``jupyter_rfb`` for a live, mouse-rotatable notebook canvas (``canvas()``).
 """
 
+import asyncio
+import threading
+from concurrent.futures import Future
 from pathlib import Path
 
 import numpy as np
@@ -97,6 +100,15 @@ class Renderer:
         # Frame the whole cube (the camera otherwise stays at its default,
         # zoomed into a corner of the data volume).
         self._view.camera.set_range()
+        # GL contexts are thread-affine (a hard crash on macOS if violated).
+        # Remember the owning thread + its event loop so cross-thread callers
+        # (e.g. ipywidgets comm handlers, which JupyterLab runs on *subshell*
+        # threads) can marshal renders back here -- see _run_on_owner_thread.
+        self._owner_thread = threading.get_ident()
+        try:
+            self._owner_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._owner_loop = None
         self._method = "mip"
         self._stretch = "linear"
         self._cmap = "hsl"
@@ -201,6 +213,27 @@ class Renderer:
         return self._axis_info
 
     # -- rendering ------------------------------------------------------------
+    def _run_on_owner_thread(self, fn, timeout=30.0):
+        """Run ``fn`` on the thread that owns the GL context and return its result.
+
+        Direct call when already on that thread. From another thread (e.g. a
+        widget comm handler on a JupyterLab subshell thread) the call is
+        scheduled onto the owner thread's asyncio loop -- calling GL from a
+        foreign thread segfaults on macOS.
+        """
+        if threading.get_ident() == self._owner_thread or self._owner_loop is None:
+            return fn()
+        fut = Future()
+
+        def runner():
+            try:
+                fut.set_result(fn())
+            except BaseException as exc:  # noqa: BLE001 - relayed to caller
+                fut.set_exception(exc)
+
+        self._owner_loop.call_soon_threadsafe(runner)
+        return fut.result(timeout=timeout)
+
     def render(self, azimuth=None, elevation=None, distance=None, fov=None,
                size=None):
         """Render offscreen and return an (H, W, 4) uint8 RGBA image.
@@ -208,20 +241,24 @@ class Renderer:
         Camera arguments are optional; unspecified ones keep their value, so
         successive calls compose (e.g. only sweep ``azimuth`` for a movie).
         ``size`` is in logical pixels; on HiDPI screens the returned image is
-        scaled by the device pixel ratio (e.g. 2x on Retina).
+        scaled by the device pixel ratio (e.g. 2x on Retina). Thread-safe: the
+        GL work always executes on the context's owning thread.
         """
-        cam = self._view.camera
-        if azimuth is not None:
-            cam.azimuth = azimuth
-        if elevation is not None:
-            cam.elevation = elevation
-        if distance is not None:
-            cam.distance = distance
-        if fov is not None:
-            cam.fov = fov
-        if size is not None and tuple(size) != tuple(self._canvas.size):
-            self._canvas.size = tuple(size)
-        return np.asarray(self._canvas.render())
+        def _render():
+            cam = self._view.camera
+            if azimuth is not None:
+                cam.azimuth = azimuth
+            if elevation is not None:
+                cam.elevation = elevation
+            if distance is not None:
+                cam.distance = distance
+            if fov is not None:
+                cam.fov = fov
+            if size is not None and tuple(size) != tuple(self._canvas.size):
+                self._canvas.size = tuple(size)
+            return np.asarray(self._canvas.render())
+
+        return self._run_on_owner_thread(_render)
 
     def save(self, path, **camera):
         """Render and write a PNG. ``**camera`` as in :meth:`render`."""
@@ -286,13 +323,18 @@ class Renderer:
 
         def redraw(method, cmap, stretch, color_method, azimuth, elevation,
                    threshold, density_factor):
-            self.method = method
-            self.cmap = cmap
-            self.stretch = stretch
-            self.color_method = color_method
-            self.threshold = threshold
-            self.density_factor = density_factor
-            frame = self.render(azimuth=azimuth, elevation=elevation)
+            # Comm handlers may run on a JupyterLab subshell thread; keep every
+            # GL-touching step on the context's owning thread.
+            def _update():
+                self.method = method
+                self.cmap = cmap
+                self.stretch = stretch
+                self.color_method = color_method
+                self.threshold = threshold
+                self.density_factor = density_factor
+                return self.render(azimuth=azimuth, elevation=elevation)
+
+            frame = self._run_on_owner_thread(_update)
             image.value = iio.imwrite("<bytes>", frame, extension=".png")
 
         controls = w.interactive(

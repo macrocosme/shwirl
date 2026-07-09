@@ -114,3 +114,44 @@ def test_save_movie_bad_extension(renderer, tmp_path):
     pytest.importorskip("imageio.v2")
     with pytest.raises(ValueError):
         renderer.save_movie(tmp_path / "spin.avi")
+
+
+@needs_gl
+def test_cross_thread_render_is_marshalled():
+    """Regression: JupyterLab delivers widget comms on a *subshell* thread; a
+    render there must be marshalled to the GL-owning thread (else macOS
+    segfaults). Mimic it: build the Renderer inside a thread running an asyncio
+    loop, then render from the main thread."""
+    import asyncio
+    import threading
+
+    from shwirl.api import Renderer
+
+    holder = {}
+    ready = threading.Event()
+
+    def owner():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        async def build():
+            holder["r"] = Renderer(demo_cube(shape=(16, 24, 24)), size=(120, 90))
+            holder["thread"] = threading.get_ident()
+            ready.set()
+
+        loop.create_task(build())
+        loop.run_forever()
+        loop.close()
+
+    t = threading.Thread(target=owner, daemon=True)
+    t.start()
+    assert ready.wait(timeout=30)
+    r = holder["r"]
+
+    # foreign-thread call: must be marshalled, not executed here
+    assert threading.get_ident() != holder["thread"]
+    img = r.render(azimuth=25)
+    assert img.ndim == 3 and img.shape[2] == 4
+
+    r._owner_loop.call_soon_threadsafe(r._owner_loop.stop)
+    t.join(timeout=10)

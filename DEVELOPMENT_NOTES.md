@@ -145,6 +145,14 @@ The renderer is now scriptable — the same GLSL transfer functions, without the
   unconditionally (the uniforms exist in every shader).
 - Tests: `shwirl/tests/test_api.py` — validation always-on; render/save/movie
   GL-gated (`SHWIRL_GL_TESTS=1`). Suite: 56 passed with GL.
+- **Kernel-death fix (post-release of the notebook):** in JupyterLab 4.6 +
+  ipykernel 7, widget comm messages are handled on a *subshell thread* while the
+  GL context lives on the shell thread that ran the cell → `glEnable` from the
+  wrong thread → SIGSEGV, silent kernel death (diagnosed from a
+  `faulthandler` dump). Fix: `Renderer` records its owning thread + asyncio
+  loop and marshals every cross-thread `render()`/widget redraw back via
+  `call_soon_threadsafe` (`_run_on_owner_thread`). Regression test simulates
+  the two-thread pattern.
 
 ## 9. Housekeeping
 
