@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 METHODS = ["mip", "lmip", "iso", "avip", "minip", "translucent2", "additive"]
+SCALES = ["Linear", "Logarithmic", "Square root", "Asinh", "Power"]
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("SHWIRL_GL_TESTS") != "1",
@@ -45,7 +46,15 @@ def test_all_shader_methods_render(canvas):
     rng = np.random.default_rng(0)
     vol = (rng.random((16, 16, 16)).astype(np.float32) ** 3) * 10.0
     volume = RenderVolume(vol, parent=view.scene, threshold=0.5)
+    # 'hsl' is a texture-LUT colormap: exercises the colormap sampler binding so
+    # a regression to the "samplers share a texture unit" GL error is caught.
+    volume.cmap = "hsl"
 
     for method in METHODS:
         volume.method = method
         canvas.render()  # compiles the GLSL for this method and draws
+
+    # Each intensity dynamic-range stretch must compile + draw (applyScale()).
+    for scale in SCALES:
+        volume.color_scale = scale
+        canvas.render()

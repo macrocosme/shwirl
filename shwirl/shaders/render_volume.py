@@ -87,7 +87,10 @@ uniform vec3 u_shape;
 uniform vec3 u_resolution;
 uniform float u_threshold;
 uniform float u_relative_step_size;
-//uniform int u_color_scale;
+// Intensity dynamic-range stretch (see applyScale below).
+uniform int u_color_scale;
+uniform float u_scale_softening;
+uniform float u_scale_power;
 //uniform float u_data_min;
 //uniform float u_data_max;
 
@@ -139,6 +142,36 @@ float rand(vec2 co)
 float colorToVal(vec4 color1)
 {{
     return color1.g;
+}}
+
+// Non-linear intensity stretches for the colormap lookup (dynamic range).
+// Input/output are in [0, 1]. Common astronomical stretches, cf. Rector et al.
+// (2007), "Image-Processing Techniques for the Creation of Presentation-Quality
+// Astronomical Images". Selected by u_color_scale:
+//   0 linear, 1 logarithmic, 2 square root, 3 asinh, 4 power (gamma).
+float applyScale(float x)
+{{
+    float v = clamp(x, 0.0, 1.0);
+    if (u_color_scale == 1) {{
+        // Logarithmic: emphasises faint structure. u_scale_softening ~ 1000.
+        return log(1.0 + u_scale_softening * v) / log(1.0 + u_scale_softening);
+    }}
+    else if (u_color_scale == 2) {{
+        // Square root.
+        return sqrt(v);
+    }}
+    else if (u_color_scale == 3) {{
+        // Asinh (arcsinh). asinh() is absent in GLSL 120, so expand it:
+        // asinh(t) = log(t + sqrt(t*t + 1)). a sets the softening.
+        float a = 10.0;
+        return log(a * v + sqrt(a * a * v * v + 1.0))
+             / log(a + sqrt(a * a + 1.0));
+    }}
+    else if (u_color_scale == 4) {{
+        // Power law (gamma). u_scale_power < 1 brightens faint features.
+        return pow(v, u_scale_power);
+    }}
+    return v; // 0: linear
 }}
 
 vec4 movingAverageFilter_line_of_sight(vec3 loc, vec3 step)
@@ -507,15 +540,17 @@ MIP_SNIPPETS = dict(
 
         // Color is associated to voxel intensity
         // Moment 0
-        if (u_color_method == 0) {  
-            gl_FragColor = $cmap(maxval);
-        } 
+        if (u_color_method == 0) {
+            gl_FragColor = $cmap(applyScale(maxval));
+        }
         // Moment 1 
         else if (u_color_method == 1) {
             
             gl_FragColor = $cmap(loc.y);
-            gl_FragColor.a = maxval;
-        } 
+            // Moment 1 colours by velocity; the dynamic-range stretch acts on
+            // the intensity, which here drives opacity.
+            gl_FragColor.a = applyScale(maxval);
+        }
         // Color is associated to RGB cube
         else if (u_color_method == 2) {
             gl_FragColor.r = loc.y;
@@ -553,7 +588,7 @@ MIP_SNIPPETS = dict(
         else {
             // Moment 2
             // TODO: verify implementation of MIP-mom2.
-            gl_FragColor = $cmap((maxval * ((maxval - loc.y) * (maxval - loc.y))) / maxval);
+            gl_FragColor = $cmap(applyScale((maxval * ((maxval - loc.y) * (maxval - loc.y))) / maxval));
         }
 
         """,
@@ -604,13 +639,13 @@ LMIP_SNIPPETS = dict(
 
         // Color is associated to voxel intensity
         if (u_color_method == 0) {
-            gl_FragColor = $cmap(local_maxval);
+            gl_FragColor = $cmap(applyScale(local_maxval));
             gl_FragColor.a = local_maxval;
         }
         // Color is associated to redshift/velocity
         else {
             gl_FragColor = $cmap(loc.y);
-            gl_FragColor.a = local_maxval;
+            gl_FragColor.a = applyScale(local_maxval);
         }
         """,
 )
@@ -639,7 +674,7 @@ TRANSLUCENT_SNIPPETS = dict(
                 integrated_color *= a1 / alpha;
                 integrated_color += color * a2 / alpha;*/
 
-                color = $cmap(val);
+                color = $cmap(applyScale(val));
 
                 a1 = integrated_color.a;
                 a2 = val * density_factor * (1 - a1);
@@ -655,7 +690,8 @@ TRANSLUCENT_SNIPPETS = dict(
                 if (u_color_method == 1) {
                     color = $cmap(loc.y);
                     a1 = integrated_color.a;
-                    a2 = val * density_factor * (1 - a1);
+                    // Stretch the intensity that drives opacity in velocity mode.
+                    a2 = applyScale(val) * density_factor * (1 - a1);
 
                     alpha = max(a1 + a2, 0.001);
 
@@ -714,7 +750,7 @@ TRANSLUCENT_SNIPPETS = dict(
             gl_FragColor = integrated_color;
         }
         else {
-            gl_FragColor = $cmap((mom0  * (mom0-mom1 * mom0-mom1)) / mom0);
+            gl_FragColor = $cmap(applyScale((mom0  * (mom0-mom1 * mom0-mom1)) / mom0));
         }
         """,
 )
@@ -729,7 +765,7 @@ TRANSLUCENT2_SNIPPETS = dict(
             float alpha;
             // Case 1: Color is associated to voxel intensity
             if (u_color_method == 0) {
-                color = $cmap(val);
+                color = $cmap(applyScale(val));
                 integrated_color = (val * density_factor + integrated_color.a * (1 - density_factor)) * color;
                 alpha = integrated_color.a;
 
@@ -742,7 +778,7 @@ TRANSLUCENT2_SNIPPETS = dict(
                 if (u_color_method == 1) {
                     color = $cmap(loc.y);
                     float a1 = integrated_color.a;
-                    float a2 = val * density_factor * (1 - a1);
+                    float a2 = applyScale(val) * density_factor * (1 - a1);
 
                     alpha = max(a1 + a2, 0.001);
 
@@ -785,7 +821,7 @@ ADDITIVE_SNIPPETS = dict(
         vec4 integrated_color = vec4(0., 0., 0., 0.);
         """,
     in_loop="""
-        color = $cmap(val);
+        color = $cmap(applyScale(val));
 
         integrated_color = 1.0 - (1.0 - integrated_color) * (1.0 - color);
         """,
@@ -809,7 +845,7 @@ ISO_SNIPPETS = dict(
             for (int i=0; i<10; i++) {
                 val = $sample(u_volumetex, iloc).g;
                 if (val > u_threshold) {
-                    color = $cmap(val);
+                    color = $cmap(applyScale(val));
                     gl_FragColor = calculateColor(color, iloc, dstep);
                     iter = nsteps;
                     break;
@@ -854,7 +890,7 @@ MINIP_SNIPPETS = dict(
 
         // Color is associated to voxel intensity
         if (u_color_method == 0) {
-            gl_FragColor = $cmap(minval);
+            gl_FragColor = $cmap(applyScale(minval));
             //gl_FragColor.a = minval;
         }
         else{
@@ -863,7 +899,7 @@ MINIP_SNIPPETS = dict(
                 gl_FragColor = $cmap(loc.y);
 
                 //if (minval == 0)
-                    gl_FragColor.a = 1-minval;
+                    gl_FragColor.a = applyScale(1-minval);
             }
             // Color is associated to RGB cube
             else {
@@ -904,7 +940,7 @@ MINIP_SNIPPETS = dict(
                 // Case 4: Mom2
                 // TODO: verify implementation of MIP-mom2.
                 else {
-                   gl_FragColor = $cmap((minval * ((minval - loc.y) * (minval - loc.y))) / minval);
+                   gl_FragColor = $cmap(applyScale((minval * ((minval - loc.y) * (minval - loc.y))) / minval));
                 }
             }
         }
@@ -1062,7 +1098,10 @@ class RenderVolumeVisual(Visual):
         # Set params
         self.method = method
         self.relative_step_size = relative_step_size
-        #self.color_scale = color_scale
+        # Intensity dynamic-range stretch (softening for log, gamma for power).
+        self._scale_softening = 1000.0
+        self._scale_power = 0.5
+        self.color_scale = color_scale
         # self.data_min = self._clim[0]
         # self.data_max = self._clim[1]
 
@@ -1105,8 +1144,10 @@ class RenderVolumeVisual(Visual):
         if self._clim is None:
             self._clim = np.nanmin(vol), np.nanmax(vol)
 
-        # Apply clim
-        vol = np.flipud(np.array(vol, dtype='float32', copy=False))
+        # Apply clim. Use asarray (not array(copy=False)): real FITS cubes are
+        # big-endian float, which must be copied to native float32 -- NumPy 2.0
+        # raises on copy=False when a copy is unavoidable.
+        vol = np.flipud(np.asarray(vol, dtype='float32'))
         if self._clim[1] == self._clim[0]:
             if self._clim[0] != 0.:
                 vol *= 1.0 / self._clim[0]
@@ -1167,6 +1208,11 @@ class RenderVolumeVisual(Visual):
     def cmap(self, cmap):
         self._cmap = get_colormap(cmap)
         self.shared_program.frag['cmap'] = Function(self._cmap.glsl_map)
+        # Bind the colormap's lookup-table texture to its own sampler unit.
+        # Without this, texture-based colormaps (e.g. 'hsl') leave the LUT
+        # sampler at unit 0, colliding with the 3D volume texture -> GL
+        # "Samplers of different types use the same texture image unit".
+        self.shared_program['texture2D_LUT'] = self._cmap.texture_lut()
         self.update()
 
     @property
@@ -1202,6 +1248,9 @@ class RenderVolumeVisual(Visual):
         self.shared_program.frag['sampler_type'] = self._tex.glsl_sampler_type
         self.shared_program.frag['sample'] = self._tex.glsl_sample
         self.shared_program.frag['cmap'] = Function(self._cmap.glsl_map)
+        # Re-bind the colormap LUT texture: assigning frag wholesale above drops
+        # the previously bound sampler (see the cmap setter for why this matters).
+        self.shared_program['texture2D_LUT'] = self._cmap.texture_lut()
         self.update()
 
     @property
@@ -1252,14 +1301,26 @@ class RenderVolumeVisual(Visual):
     def color_scale(self):
         return self._color_scale
 
+    # Intensity dynamic-range stretches, matching the GLSL applyScale() selector.
+    _SCALE_CODES = {
+        'linear': 0,
+        'log': 1, 'logarithmic': 1,
+        'sqrt': 2, 'square root': 2,
+        'asinh': 3, 'arcsinh': 3,
+        'power': 4, 'gamma': 4,
+    }
+
     @color_scale.setter
     def color_scale(self, color_scale):
-        if (color_scale == 'linear'):
-            self._color_scale = 0
+        if isinstance(color_scale, str):
+            self._color_scale = self._SCALE_CODES.get(color_scale.strip().lower(), 0)
         else:
-            self._color_scale = 1
+            self._color_scale = int(color_scale)
 
-        self.shared_program['u_color_scale'] = int(self._color_scale)
+        if 'u_color_scale' in self.shared_program:
+            self.shared_program['u_color_scale'] = int(self._color_scale)
+            self.shared_program['u_scale_softening'] = float(self._scale_softening)
+            self.shared_program['u_scale_power'] = float(self._scale_power)
         self.update()
 
     @property

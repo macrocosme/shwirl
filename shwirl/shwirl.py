@@ -5,9 +5,6 @@ from pathlib import Path
 
 import numpy as np
 
-# Astropy imports
-from astropy.io import fits
-
 # Qt imports (PySide6)
 from PySide6 import QtCore
 from PySide6.QtCore import Qt
@@ -20,8 +17,136 @@ from vispy import app, io, scene
 from vispy.color import get_colormaps
 from vispy.gloo import gl
 
+from .fits_loader import (
+    FitsLoadError,
+    build_cube,
+    default_selection,
+    describe_axes,
+    find_data_hdu,
+    is_ambiguous,
+    open_fits,
+    squeeze_degenerate,
+)
+from .labels import factor_suffix, format_range, offset_format, short_axis_name
 from .shaders import RenderVolume
 from .shaders.axes import AxesVisual3D
+
+# Recognised file extensions. FITS may be plain or gzip-compressed; astropy's
+# fits.open() decompresses ``.gz`` transparently, so both are read identically.
+FITS_EXTENSIONS = ('.fits', '.fit', '.fts', '.fits.gz', '.fit.gz', '.fts.gz')
+FILTERBANK_EXTENSIONS = ('.fil',)
+
+
+def is_fits_filename(name):
+    """Return True if `name` is a (optionally gzipped) FITS file, case-insensitively."""
+    return name.lower().endswith(FITS_EXTENSIONS)
+
+
+def is_filterbank_filename(name):
+    """Return True if `name` is a SigProc filterbank file, case-insensitively."""
+    return name.lower().endswith(FILTERBANK_EXTENSIONS)
+
+
+class LoadedCube:
+    """Normalised container passed to the renderer.
+
+    Wraps the ready-to-render 3D ``(depth, y, x)`` array, the source header, the
+    per-display-axis metadata from :mod:`shwirl.fits_loader` (``None`` for
+    filterbank data), and a ``kind`` tag (``'fits'`` or ``'filterbank'``).
+    """
+
+    def __init__(self, data, header, axis_info, kind='fits'):
+        self.data = data
+        self.header = header
+        self.axis_info = axis_info
+        self.kind = kind
+
+
+class AxisSelectionDialog(QDialog):
+    """Let the user map FITS axes to display X/Y/Z when a cube is ambiguous (>3D).
+
+    One combo box per display axis (X, Y, Z-depth) lists the available FITS axes;
+    any axis not chosen for display gets a spin box to fix its index. Seeded from
+    a starting selection so it can also be reopened to re-slice a loaded cube.
+    """
+
+    def __init__(self, axes, selection=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select axes to display")
+        self.axes = axes
+        selection = selection or default_selection(axes)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(
+            "This cube has more than three dimensions. Choose which axes map to\n"
+            "the display, and an index for any axis held fixed."))
+
+        def label_for(a):
+            ctype = a["ctype"] or f"axis {a['fits_index']}"
+            return f"{ctype}  (len {a['length']})"
+
+        self._combos = {}
+        grid = QGridLayout()
+        for row, role in enumerate(("x", "y", "z")):
+            grid.addWidget(QLabel(f"{role.upper()} axis:"), row, 0)
+            combo = QComboBox()
+            for a in axes:
+                combo.addItem(label_for(a), a["fits_index"])
+            current = selection.get(role)
+            if current is not None:
+                combo.setCurrentIndex(
+                    [a["fits_index"] for a in axes].index(current["fits_index"]))
+            combo.currentIndexChanged.connect(self._refresh_fixed)
+            self._combos[role] = combo
+            grid.addWidget(combo, row, 1)
+        layout.addLayout(grid)
+
+        self._fixed_box = QGroupBox("Fixed index for remaining axes")
+        self._fixed_layout = QGridLayout(self._fixed_box)
+        self._spins = {}
+        layout.addWidget(self._fixed_box)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        # Pre-fill fixed indices from the incoming selection, then render rows.
+        self._preset_fixed = {a["fits_index"]: i for a, i in selection.get("fixed", [])}
+        self._refresh_fixed()
+
+    def _chosen_display_indices(self):
+        return {self._combos[r].currentData() for r in ("x", "y", "z")}
+
+    def _refresh_fixed(self):
+        # Rebuild the fixed-index spin boxes for axes not assigned to X/Y/Z.
+        for i in reversed(range(self._fixed_layout.count())):
+            self._fixed_layout.itemAt(i).widget().setParent(None)
+        self._spins = {}
+        display = self._chosen_display_indices()
+        row = 0
+        for a in self.axes:
+            if a["fits_index"] in display:
+                continue
+            ctype = a["ctype"] or f"axis {a['fits_index']}"
+            self._fixed_layout.addWidget(QLabel(f"{ctype} index:"), row, 0)
+            spin = QSpinBox()
+            spin.setRange(0, max(0, a["length"] - 1))
+            spin.setValue(min(self._preset_fixed.get(a["fits_index"], 0),
+                              max(0, a["length"] - 1)))
+            self._fixed_layout.addWidget(spin, row, 1)
+            self._spins[a["fits_index"]] = spin
+            row += 1
+        self._fixed_box.setVisible(row > 0)
+
+    def selection(self):
+        """Return the selection dict chosen by the user."""
+        by_index = {a["fits_index"]: a for a in self.axes}
+        chosen = {r: by_index[self._combos[r].currentData()] for r in ("x", "y", "z")}
+        display = {a["fits_index"] for a in chosen.values()}
+        fixed = [(by_index[idx], spin.value())
+                 for idx, spin in self._spins.items() if idx not in display]
+        return {"x": chosen["x"], "y": chosen["y"], "z": chosen["z"], "fixed": fixed}
 
 
 class MainWindow(QMainWindow):
@@ -126,13 +251,9 @@ class MainWindow(QMainWindow):
         prints the HDU information, set the min and max values based on data, enables widgets,
         sets rendering parameters and view.
         """
-        self.Canvas3D.set_volume_scene(self.props['load_button'].loaded_cube)
-        try:
-            self.fits_infos.print_header(self.props['load_button'].loaded_cube[0].header, 'fits')
-        except Exception:
-            # This is shady. The type should be properly assessed.
-            self.fits_infos.print_header(self.props['load_button'].loaded_cube.header, 'filterbank')
-            pass
+        loaded_cube = self.props['load_button'].loaded_cube
+        self.Canvas3D.set_volume_scene(loaded_cube)
+        self.fits_infos.print_header(loaded_cube.header, loaded_cube.kind)
 
         for type in self.widget_types:
             self.props[type].update_discard_filter_text(self.props['load_button'].vol_min,
@@ -153,7 +274,8 @@ class MainWindow(QMainWindow):
         self.Canvas3D.set_rendering_params(self.props['rendering_params'].combo_tf_method.currentText(),
                                self.props['rendering_params'].combo_cmap.currentText(),
                                self.props['rendering_params'].combo_color_method.currentText(),
-                               self.props['rendering_params'].combo_interpolation_method.currentText())
+                               self.props['rendering_params'].combo_interpolation_method.currentText(),
+                               self.props['rendering_params'].combo_color_scale.currentText())
 
         if self.props['rendering_params'].combo_tf_method.currentText() == 'lmip':
             self.update_threshold()
@@ -390,7 +512,10 @@ class ObjectWidget(QWidget):
         if type == 'load_button':
             self.load_button = QPushButton("Load Spectral Cube", self)
             self.load_button.clicked.connect(self.showLoadFitsDialog)
-            array = [self.load_button]
+            self.select_axes_button = QPushButton("Select axes…", self)
+            self.select_axes_button.clicked.connect(self.reselect_axes)
+            self.select_axes_button.setEnabled(False)
+            array = [self.load_button, self.select_axes_button]
             serialize_widgets('fits_button', '', array)
 
         elif type == 'view':
@@ -520,6 +645,16 @@ class ObjectWidget(QWidget):
             self.combo_cmap.currentIndexChanged.connect(self.update_param)
             array = [l_cmap, self.combo_cmap]
             serialize_widgets('cmap', '', array)
+
+            # Intensity dynamic-range stretch (Rector et al. 2007). Labels here
+            # map to shwirl.shaders.render_volume RenderVolume._SCALE_CODES.
+            l_color_scale = QLabel("Dynamic range ")
+            self.color_scale = ['Linear', 'Logarithmic', 'Square root', 'Asinh', 'Power']
+            self.combo_color_scale = QComboBox(self)
+            self.combo_color_scale.addItems(self.color_scale)
+            self.combo_color_scale.currentIndexChanged.connect(self.update_param)
+            array = [l_color_scale, self.combo_color_scale]
+            serialize_widgets('color_scale', '', array)
 
         # l_color_scale = QLabel("Color scale ")
         # self.color_scale = ['linear', 'log', 'exp']
@@ -714,38 +849,42 @@ class ObjectWidget(QWidget):
         """
         filename = QFileDialog.getOpenFileName(self,
                                                'Open file',
-                                               filter='FITS Images (*.fits, *.FITS)')
-                                               #filter='FITS Images (*.fits, *.FITS); SigProc Filterbank (*.fil)')
+                                               filter='FITS Images (*.fits *.fit *.fts *.fits.gz *.fit.gz *.fts.gz);;All files (*)')
 
         if filename[0] != "":
-            if filename[0].split('.')[-1] in ['fits', 'FITS']:
-                # Load file
-                # print(filename)
-                self.loaded_cube = fits.open(filename[0])
-
+            if is_fits_filename(filename[0]):
+                # Load robustly (plain or gzipped; astropy handles .gz natively).
+                # See shwirl.fits_loader for HDU selection / dimension handling.
                 try:
-                    self.vol_min = self.loaded_cube[0].header["DATAMIN"]
-                    self.vol_max = self.loaded_cube[0].header["DATAMAX"]
+                    hdu = find_data_hdu(open_fits(filename[0]))
+                except FitsLoadError as exc:
+                    QMessageBox.critical(self, "Cannot open FITS file", str(exc))
+                    return
 
-                    # print("DATAMIN", self.vol_min)
-                    # print("DATAMAX", self.vol_max)
-                except Exception:
-                    # print("Warning: DATAMIN and DATAMAX not present in header; evaluating min and max")
-                    if self.loaded_cube[0].header["NAXIS"] == 3:
-                        self.vol_min = np.nanmin(self.loaded_cube[0].data)
-                        self.vol_max = np.nanmax(self.loaded_cube[0].data)
-                    else:
-                        self.vol_min = np.nanmin(self.loaded_cube[0].data[0])
-                        self.vol_max = np.nanmax(self.loaded_cube[0].data[0])
+                axes = describe_axes(hdu.header)
+                try:
+                    data, axes = squeeze_degenerate(hdu.data, axes)
+                except FitsLoadError as exc:
+                    QMessageBox.critical(self, "Cannot open FITS file", str(exc))
+                    return
 
-                # # Will trigger update clim
-                # self.l_clim_min.setText(str(min))
-                # self.l_clim_max.setText(str(max))
+                if is_ambiguous(axes):
+                    # >3 real dimensions: let the user choose which to display.
+                    dialog = AxisSelectionDialog(axes, parent=self)
+                    if dialog.exec() != QDialog.Accepted:
+                        return
+                    selection = dialog.selection()
+                else:
+                    selection = default_selection(axes)
 
-                # for widgets in self.widgets_array:
-                #     for widget in widgets:
-                #         widget.setEnabled(True)
-            if filename[0].split('.')[-1] in ['fil']:
+                # Keep the squeezed source around so "Select axes..." can re-slice
+                # without re-reading the file.
+                self._source_data = data
+                self._source_axes = axes
+                self._source_header = hdu.header
+                self.axis_selection = selection
+                self._build_loaded_cube()
+            if is_filterbank_filename(filename[0]):
                 # Load file. blimpy is an optional dependency, only required for
                 # filterbank (.fil) files; import lazily so the core app and
                 # FITS loading work without it (install with: pip install
@@ -757,28 +896,61 @@ class ObjectWidget(QWidget):
                         "Reading filterbank (.fil) files requires blimpy. "
                         "Install it with: pip install 'shwirl[filterbank]'"
                     ) from exc
-                self.loaded_cube = Waterfall(filename[0], max_load=5.5, load_data=False)
-                self.loaded_cube.read_data(f_start=None, f_stop=None, t_start=0, t_stop=10 * 12500 + 1024)
-                self.loaded_cube.data = self.clean_data(np.swapaxes(np.swapaxes(self.loaded_cube.data, 0, 2), 1, 2)[:,:,0])
-                self.loaded_cube.data = np.expand_dims(np.fliplr(np.swapaxes(self.loaded_cube.data, 0, 1)), axis=2)
-                # median = np.median(self.loaded_cube.data)
-                # std = np.std(self.loaded_cube.data)
-                # mask = np.abs(self.loaded_cube.data - median) > (2.698*std)
+                waterfall = Waterfall(filename[0], max_load=5.5, load_data=False)
+                waterfall.read_data(f_start=None, f_stop=None, t_start=0, t_stop=10 * 12500 + 1024)
+                data = self.clean_data(np.swapaxes(np.swapaxes(waterfall.data, 0, 2), 1, 2)[:,:,0])
+                data = np.expand_dims(np.fliplr(np.swapaxes(data, 0, 1)), axis=2)
+                # median = np.median(data)
+                # std = np.std(data)
+                # mask = np.abs(data - median) > (2.698*std)
                 #
                 # print ("mask", mask)
 
                 # from astropy import visualization
                 # stretch = visualization.AsinhStretch(0.01) + visualization.MinMaxInterval()
-                # self.loaded_cube.data = stretch(self.loaded_cube.data)
+                # data = stretch(data)
 
                 try:
-                    self.vol_min = self.loaded_cube.header["DATAMIN"]
-                    self.vol_max = self.loaded_cube.header["DATAMAX"]
+                    self.vol_min = waterfall.header["DATAMIN"]
+                    self.vol_max = waterfall.header["DATAMAX"]
                 except Exception:
-                    self.vol_min = np.nanmin(self.loaded_cube.data)
-                    self.vol_max = np.nanmax(self.loaded_cube.data)
+                    self.vol_min = np.nanmin(data)
+                    self.vol_max = np.nanmax(data)
+
+                self.loaded_cube = LoadedCube(data, waterfall.header, None, kind='filterbank')
+                self.select_axes_button.setEnabled(False)
 
             self.signal_file_loaded.emit()
+
+    def _build_loaded_cube(self):
+        """Build the normalised `LoadedCube` from the current axis selection.
+
+        Shared by the initial FITS load and the "Select axes..." re-slice path.
+        """
+        cube, axis_info = build_cube(self._source_data, self.axis_selection)
+        self.vol_min = float(np.nanmin(cube))
+        self.vol_max = float(np.nanmax(cube))
+        self.loaded_cube = LoadedCube(cube, self._source_header, axis_info, kind='fits')
+        # Re-slicing is only meaningful when there is more than one way to map axes.
+        self.select_axes_button.setEnabled(len(self._source_axes) >= 3)
+
+    def reselect_axes(self):
+        """Reopen the axis chooser for the loaded cube and re-render on accept.
+
+        Only meaningful for cubes with at least three real axes (3D+); a no-op
+        otherwise (e.g. 2D images or filterbank data).
+        """
+        if getattr(self, '_source_data', None) is None:
+            return
+        if len(getattr(self, '_source_axes', [])) < 3:
+            return
+        dialog = AxisSelectionDialog(self._source_axes,
+                                     selection=self.axis_selection, parent=self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        self.axis_selection = dialog.selection()
+        self._build_loaded_cube()
+        self.signal_file_loaded.emit()
 
     def update_discard_filter_text(self, min, max):
         """Update the discard filter text field.
@@ -1127,7 +1299,17 @@ class Canvas3D(scene.SceneCanvas):
         --------
         ColorBarWidget
         """
-        self.cbar = scene.ColorBarWidget(orientation=position,
+        # vispy places the label + tick numbers a fixed small distance from the
+        # (thin) bar, so by default the rotated title lands on top of the bar.
+        # Nudge the text just clear of it.
+        from vispy.visuals.colorbar import ColorBarVisual
+        ColorBarVisual.text_padding_factor = 1.8
+
+        # The bar sits in the left column, so render its label/ticks on the bar's
+        # *interior* (right) side -- otherwise 'left' pushes them off the canvas'
+        # left edge. `position` still controls where the widget is placed.
+        bar_orientation = "right" if position in ("left", "right") else position
+        self.cbar = scene.ColorBarWidget(orientation=bar_orientation,
                                          label=label,
                                          cmap=cmap,
                                          clim=clim,
@@ -1135,47 +1317,47 @@ class Canvas3D(scene.SceneCanvas):
                                          border_color=border_color,
                                          **kwargs)
 
+        # A wider column keeps the bar off the canvas edge so its left-hand
+        # labels/ticks stay fully in frame.
         if self.window_resolution.width() <= 3000:
-            self.CBAR_LONG_DIM = 150
-            self.cbar.label.font_size = 15
+            self.CBAR_LONG_DIM = 210
+            self.cbar.label.font_size = 14
             self.cbar.label.color = "white"
             self.cbar.ticks[0].font_size = 12
             self.cbar.ticks[1].font_size = 12
             self.cbar.ticks[0].color = "white"
             self.cbar.ticks[1].color = "white"
         else:
-            self.CBAR_LONG_DIM = 300
-            self.cbar.label.font_size = 60
+            self.CBAR_LONG_DIM = 380
+            self.cbar.label.font_size = 55
             self.cbar.label.color = "white"
             self.cbar.ticks[0].font_size = 45
             self.cbar.ticks[1].font_size = 45
             self.cbar.ticks[0].color = "white"
             self.cbar.ticks[1].color = "white"
 
-        # colorbar - column 1
-        # view - column 2
-
-        if self.cbar.orientation == "bottom":
+        # Placement keys off `position` (the widget's own orientation is forced
+        # to 'right' above so its labels face the canvas interior).
+        if position == "bottom":
             self.grid.remove_widget(self.cbar)
             self.cbar_bottom = self.grid.add_widget(self.cbar, row=2, col=1)
-            self.cbar_bottom.height_max = \
-                self.cbar_bottom.height_max = self.CBAR_LONG_DIM
+            self.cbar_bottom.height_max = self.CBAR_LONG_DIM
 
-        elif self.cbar.orientation == "top":
+        elif position == "top":
             self.grid.remove_widget(self.cbar)
             self.cbar_top = self.grid.add_widget(self.cbar, row=0, col=1)
-            self.cbar_top.height_max = self.cbar_top.height_max = self.CBAR_LONG_DIM
+            self.cbar_top.height_max = self.CBAR_LONG_DIM
 
-        elif self.cbar.orientation == "left":
+        else:  # 'left' or 'right' -> vertical bar in the left column
             self.grid.remove_widget(self.cbar)
             self.cbar_left = self.grid.add_widget(self.cbar, row=0, col=0)
             self.cbar_left.width_max = self.cbar_left.width_min = self.CBAR_LONG_DIM
 
-        else:
-            self.grid.remove_widget(self.cbar)
-            self.cbar_right = self.grid.add_widget(self.cbar, row=2, col=2)
-            self.cbar_right.width_max = \
-                self.cbar_right.width_min = self.CBAR_LONG_DIM
+        # Format the initial ticks (set_rendering_params refreshes them per change).
+        try:
+            self._apply_colorbar(cmap, clim, str(label))
+        except (TypeError, ValueError, IndexError):
+            pass
 
     def histogram(self, data, bins=100, color='w', orientation='h'):
         """Calculate and show a histogram of data
@@ -1221,85 +1403,91 @@ class Canvas3D(scene.SceneCanvas):
         self.view = self.grid.add_view(row=0, col=1, border_color='#404040', bgcolor="#404040")
 
         try:
-            cube = cube[0]
-        except Exception:
-            pass
-
-        try:
             # Quick fix -- will need to be a bit more clever.
             self.parse_header_info_for_axes_labels(cube)
 
-            if len(cube.data.shape) == 4:
-                # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-                data = cube.data[0][:2048, :2048, :2048]
+            # ``cube.data`` is already a normalised 3D (depth, y, x) array (see
+            # LoadedCube / fits_loader). Hard 2048 cap avoids overflowing GPU
+            # texture memory.
+            data = cube.data[:2048, :2048, :2048]
+            self.vel_axis = data.shape[0]
 
-                self.vel_axis = cube.data[0].shape[0]
-            else:
-                # Currently forces a hard 2048 limit to avoid overflowing the gpu texture memory...
-                data = cube.data[:2048, :2048, :2048]
-                # data = cube.data[:,60:-60,:]
-                # data = cube.data[:, :, :]
-                self.vel_axis = cube.data.shape[0]
+            # Prefer the chosen depth axis's WCS (axis_info) over hardcoded
+            # CTYPE3, so an arbitrary axis mapping is labelled correctly.
+            zinfo = cube.axis_info['z'] if getattr(cube, 'axis_info', None) else None
 
             try:
                 self.bunit = cube.header['BUNIT']
             except Exception:
                 self.bunit = "unknown"
 
-            try:
-                self.vel_type = cube.header['CTYPE3']
-            except Exception:
-                self.vel_type = "Epoch"
+            if zinfo is not None and zinfo['ctype']:
+                self.vel_type = zinfo['ctype']
+            else:
+                try:
+                    self.vel_type = cube.header['CTYPE3']
+                except Exception:
+                    self.vel_type = "Epoch"
+
+            def _cunit():
+                if zinfo is not None and zinfo['cunit']:
+                    return zinfo['cunit']
+                return cube.header.get('CUNIT3', '') if hasattr(cube.header, 'get') else ''
 
             try:
                 # TODO: Possibly use astropy's wcs module for all of this.
-                self.vel_val = cube.header['CRVAL3']
-                lim_is_set = False
-                try:
-                    self.vel_delt = cube.header['CDELT3']
+                if zinfo is not None:
+                    self.vel_val = zinfo['crval']
+                    self.vel_delt = zinfo['cdelt']
                     set_lim = True
-                except Exception:
-                    # print("No CDELT3 card in header.")
-                    set_lim = False
+                else:
+                    self.vel_val = cube.header['CRVAL3']
+                    try:
+                        self.vel_delt = cube.header['CDELT3']
+                        set_lim = True
+                    except Exception:
+                        # print("No CDELT3 card in header.")
+                        set_lim = False
+                lim_is_set = False
 
                 if self.vel_type == 'VELO-HEL' or self.vel_type == 'FELO-HEL':
                     self.vel_type += ' (km/s)'
                     if set_lim:
-                        self.clim_vel = np.int(np.round(float(self.vel_val) / 1000)), np.int(
+                        self.clim_vel = int(np.round(float(self.vel_val) / 1000)), int(
                             np.round((float(self.vel_val) +
                                       float(self.vel_delt) *
                                       self.vel_axis) / 1000))
                         lim_is_set = True
 
                 elif self.vel_type == 'FREQ':
-                    if cube.header['CUNIT3'] == 'Hz':
-                        self.vel_type += ' (T' + cube.header['CUNIT3'] + ')'  # Hz to THz
+                    if _cunit() == 'Hz':
+                        self.vel_type += ' (T' + _cunit() + ')'  # Hz to THz
                         self.clim_vel = float(self.vel_val) / (1000 * 1000 * 1000), \
                                         (float(self.vel_val) + float(self.vel_delt) * self.vel_axis) / (
                                         1000 * 1000 * 1000)
                         lim_is_set = True
                     else:
-                        self.vel_type += ' (' + cube.header['CUNIT3'] + ')'
-                        self.clim_vel = np.int(np.round(float(self.vel_val))), \
-                                        np.int(np.round(float(self.vel_val) +
-                                                         float(self.vel_delt) *
-                                                         self.vel_axis))
+                        self.vel_type += ' (' + _cunit() + ')'
+                        self.clim_vel = int(np.round(float(self.vel_val))), \
+                                        int(np.round(float(self.vel_val) +
+                                                     float(self.vel_delt) *
+                                                     self.vel_axis))
                         lim_is_set = True
                 elif self.vel_type == 'WAVE':
-                    self.vel_type += ' (' + cube.header['CUNIT3'] + ')'
+                    self.vel_type += ' (' + _cunit() + ')'
 
                 if set_lim and not lim_is_set:
-                    self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round(float(self.vel_val) +
-                                                                                            float(self.vel_delt) *
-                                                                                            self.vel_axis))
+                    self.clim_vel = int(np.round(float(self.vel_val))), int(np.round(float(self.vel_val) +
+                                                                                     float(self.vel_delt) *
+                                                                                     self.vel_axis))
                     lim_is_set = True
 
                 if not set_lim:
                     try:
                         self.vel_delt = cube.header['STEP']
-                        self.clim_vel = np.int(np.round(float(self.vel_val))), np.int(np.round(float(self.vel_val) +
-                                                                                                float(self.vel_delt) *
-                                                                                                self.vel_axis))
+                        self.clim_vel = int(np.round(float(self.vel_val))), int(np.round(float(self.vel_val) +
+                                                                                         float(self.vel_delt) *
+                                                                                         self.vel_axis))
                     except Exception:
                         self.clim_vel = 0, self.vel_axis
 
@@ -1338,13 +1526,13 @@ class Canvas3D(scene.SceneCanvas):
                 )
             )
 
-            self.axis.xlabel = self.axes_info[0]['label']
-            self.axis.ylabel = self.axes_info[1]['label']
-            self.axis.zlabel = self.axes_info[2]['label']
+            # Short names on the in-scene triad; full numeric ranges go to the
+            # screen-fixed info panel (below).
+            self.axis.xlabel = short_axis_name(self.axes_info[0]['label'])
+            self.axis.ylabel = short_axis_name(self.axes_info[1]['label'])
+            self.axis.zlabel = short_axis_name(self.axes_info[2]['label'])
 
-            self.axis.xlim = self.axes_info[0]['minval'], self.axes_info[0]['maxval']
-            self.axis.ylim = self.axes_info[1]['minval'], self.axes_info[1]['maxval']
-            self.axis.zlim = self.axes_info[2]['minval'], self.axes_info[2]['maxval']
+            self._update_info_panel()
 
             # Increase line width for more visibility
             gl.glLineWidth(1.5)
@@ -1384,7 +1572,8 @@ class Canvas3D(scene.SceneCanvas):
             t = e
             print(t)
 
-    def set_rendering_params(self, tf_method, cmap, combo_color_method, interpolation_method):
+    def set_rendering_params(self, tf_method, cmap, combo_color_method, interpolation_method,
+                             color_scale='Linear'):
         """Set rendering parameters for the visualised volume.
 
         Parameters
@@ -1397,34 +1586,49 @@ class Canvas3D(scene.SceneCanvas):
             Color method (e.g. mom0, mom1, rgb)
         interpolation_method : str
             Interpolation method
+        color_scale : str
+            Intensity dynamic-range stretch (Linear, Logarithmic, Square root,
+            Asinh, Power).
         """
         self.volume.method = tf_method
         self.volume.cmap = cmap
         self.volume.color_method = combo_color_method
         self.volume.interpolation = interpolation_method
+        self.volume.color_scale = color_scale
 
-        if (self.volume.color_method == 0):
-            label = str(self.bunit)
-            clim = self.volume.clim
-            self.cbar_left.visible = True
+        # Keep the colorbar gradient in sync with the volume colormap even while
+        # it is hidden (color methods 2/3), so it is correct when shown again.
+        self.cbar.cmap = cmap
+
+        if self.volume.color_method == 0:
+            self._apply_colorbar(cmap, self.volume.clim, str(self.bunit))
             self.show_colorbar = True
-
-        elif (self.volume.color_method == 2):
-            self.cbar_left.visible = False
-            self.show_colorbar = False
-        elif (self.volume.color_method == 3):
-            self.cbar_left.visible = False
+        elif self.volume.color_method in (2, 3):
             self.show_colorbar = False
         else:
-            label = str(self.vel_type)
-            clim = self.clim_vel
-            self.cbar_left.visible = True
+            self._apply_colorbar(cmap, self.clim_vel, str(self.vel_type))
             self.show_colorbar = True
 
-        if self.show_colorbar:
-            self.cbar.clim = clim
-            self.cbar.label_str = label
-            self.cbar.cmap = cmap
+        self.cbar_left.visible = self.show_colorbar
+
+    def _apply_colorbar(self, cmap, clim, label_base):
+        """Refresh the colorbar gradient, range and compact offset-formatted labels.
+
+        vispy's ColorBar regenerates its tick text as ``str(clim)`` on every draw,
+        so we cannot override the tick TextVisuals directly. Instead we feed it the
+        already-scaled, short endpoint values and move the common ``×10ⁿ`` factor
+        into the label -- keeping the numbers compact and inside the frame. `clim`
+        is (min, max) in data units.
+        """
+        self.cbar.cmap = cmap
+        exp, (lo, hi) = offset_format(clim[0], clim[1])
+        try:
+            self.cbar.clim = (float(lo), float(hi))
+        except (TypeError, ValueError):
+            self.cbar.clim = tuple(clim)
+        suffix = factor_suffix(exp)
+        self.cbar.label.text = f"{label_base} ({suffix})" if suffix else label_base
+        self.cbar.update()
 
     def set_threshold(self, threshold):
         """Set threshold value for the visualised volume.
@@ -1651,26 +1855,81 @@ class Canvas3D(scene.SceneCanvas):
             translate=(-scalex ** 2, -scalez ** 2, -scaley ** 2)
         )
 
+    def _update_info_panel(self):
+        """Screen-fixed overlay listing each axis' name + numeric range.
+
+        A small translucent QLabel anchored to the lower-right of the GL canvas
+        (`self.native`); keeps the numbers out of the 3D scene while staying
+        horizontal and always readable. Uses offset formatting so large ranges
+        stay compact.
+        """
+        lines = []
+        for info in self.axes_info:
+            name = short_axis_name(info.get('label', ''))
+            rng = format_range(info.get('minval', 0), info.get('maxval', 1),
+                               unit=info.get('unit', ''))
+            lines.append(f"{name}   {rng}")
+        text = "\n".join(lines)
+
+        if getattr(self, '_info_panel', None) is None:
+            self._info_panel = QLabel(self.native)
+            self._info_panel.setStyleSheet(
+                "QLabel { color: #eaeaea; background: rgba(20, 20, 20, 150);"
+                " padding: 6px 9px; border-radius: 4px; font-size: 11px;"
+                " font-family: monospace; }")
+            self._info_panel.setAttribute(Qt.WA_TransparentForMouseEvents)
+            # Keep it pinned to the lower-right as the canvas resizes.
+            self.events.resize.connect(lambda ev: self._reposition_info_panel())
+        self._info_panel.setText(text)
+        self._reposition_info_panel()
+        self._info_panel.show()
+        self._info_panel.raise_()
+
+    def _reposition_info_panel(self):
+        """Pin the info panel to the lower-right corner of the canvas."""
+        panel = getattr(self, '_info_panel', None)
+        if panel is None:
+            return
+        panel.adjustSize()
+        margin = 12
+        x = max(margin, self.native.width() - panel.width() - margin)
+        y = max(margin, self.native.height() - panel.height() - margin)
+        panel.move(x, y)
+
     def parse_header_info_for_axes_labels(self, cube):
         """Collect information from cube's header
 
         :param cube: astropy.fits
         """
         self.axes_info = [{}, {}, {}]
-        if len(cube.data.shape) == 4:
-            index = [1, 3, 2]
-            for i in range(3):
+
+        axis_info = getattr(cube, 'axis_info', None)
+        if axis_info is not None:
+            # Display order matches AxesVisual3D: [x, z(depth), y]. Range runs from
+            # CRVAL to CRVAL + N*CDELT (approx; CRPIX ignored) -- the true start/end
+            # coordinate, unlike the old N*CDELT - CRVAL expression.
+            for i, key in enumerate(('x', 'z', 'y')):
+                a = axis_info[key]
+                self.axes_info[i]['label'] = a['label']
+                self.axes_info[i]['minval'] = a['crval']
+                self.axes_info[i]['maxval'] = a['crval'] + a['length'] * a['cdelt']
+                self.axes_info[i]['unit'] = a.get('cunit', '')
+            return
+
+        # Fallback (e.g. filterbank / no axis_info): best-effort from header cards.
+        index = [1, 3, 2]
+        for i in range(3):
+            try:
                 self.axes_info[i]['label'] = cube.header['CTYPE' + str(index[i])]
                 self.axes_info[i]['minval'] = cube.header['CRVAL' + str(index[i])]
-                self.axes_info[i]['maxval'] = (cube.data[0].shape[2 - i] *
-                                               cube.header['CDELT' + str(index[i])]) - self.axes_info[i]['minval']
-        else:
-            index = [1, 3, 2]
-            for i in range(3):
-                self.axes_info[i]['label'] = cube.header['CTYPE' + str(index[i])]
-                self.axes_info[i]['minval'] = cube.header['CRVAL' + str(index[i])]
-                self.axes_info[i]['maxval'] = (cube.data.shape[2 - i] *
-                                               cube.header['CDELT' + str(index[i])]) - cube.header['CRVAL' + str(index[i])]
+                self.axes_info[i]['maxval'] = (cube.header['CRVAL' + str(index[i])] +
+                                               cube.data.shape[2 - i] * cube.header['CDELT' + str(index[i])])
+                self.axes_info[i]['unit'] = cube.header.get('CUNIT' + str(index[i]), '')
+            except Exception:
+                self.axes_info[i].setdefault('label', 'Undefined')
+                self.axes_info[i].setdefault('minval', 0)
+                self.axes_info[i].setdefault('maxval', 1)
+                self.axes_info[i].setdefault('unit', '')
 
 
 # -----------------------------------------------------------------------------

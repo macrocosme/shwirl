@@ -5,106 +5,172 @@ import numpy as np
 from vispy import scene
 
 # from vispy.geometry import create_cube
-from vispy.visuals.transforms import ChainTransform, STTransform
+
+
+# Per-display-axis colours for the orientation triad (x, y, z), matching the
+# order used by ``create_cube``: shape[2]=x, shape[1]=y, shape[0]=z.
+TRIAD_COLORS = ((1.0, 0.35, 0.35, 1.0),   # x  – warm red
+                (0.4, 0.9, 0.4, 1.0),     # y  – green
+                (0.45, 0.6, 1.0, 1.0))    # z  – blue
 
 
 class AxesVisual3D:
+    """Minimal, readable 3D annotation for the data cube.
 
-    def __init__(self, parent, data_shape, view=None, transform=None, tick_label_margin=40,
-                 axis_label_margin=200, **kwargs):
+    Rather than dense per-edge WCS ticks (hard to read and overlapping in 3D),
+    this draws:
+
+    - the cube outline;
+    - a small **orientation triad** at the near corner (three short coloured
+      arrows + short axis names) that rotates with the data, so the viewer can
+      always tell which way each axis runs.
+
+    Numeric axis *ranges* are shown separately by a screen-fixed info panel
+    (built in ``shwirl.shwirl``), keeping the 3D scene uncluttered.
+    """
+
+    def __init__(self, parent, data_shape, view=None, transform=None,
+                 axis_names=("X", "Y", "Z"), **kwargs):
 
         self.view = view
+        self._names = list(axis_names)
+        self._text_color = kwargs.get("text_color", "white")
+        self._axis_color = kwargs.get("axis_color", "white")
+        font_size = kwargs.get("axis_font_size", 14)
 
-        # Add a 3D cube to show us the unit cube. The 1.001 factor is to make
-        # sure that the grid lines are not 'hidden' by volume renderings on the
-        # front side due to numerical precision.
-        # vertices, filled_indices, outline_indices = create_cube()
-        vertices, filled_indices, outline_indices = self.create_cube(data_shape)
-        self.axis = scene.visuals.Mesh(vertices['position'],
-                                       outline_indices, parent=self.view.scene,
-                                       color=kwargs['axis_color'], mode='lines')
+        # Cube extents in data coordinates (x=shape[2], y=shape[1], z=shape[0]).
+        self._ext = (data_shape[2], data_shape[1], data_shape[0])
+        scene_parent = self.view.scene
 
-        self.axis.transform = transform
+        # --- Cube outline -----------------------------------------------------
+        vertices, _filled, outline_indices = self.create_cube(data_shape)
+        self.axis = scene.visuals.Mesh(vertices['position'], outline_indices,
+                                       parent=scene_parent,
+                                       color=self._axis_color, mode='lines')
 
-        self.xax = scene.visuals.Axis(pos=[[0, 0],
-                                           [data_shape[2], 0]],
-                                      tick_direction=(0, -1),
-                                      parent=parent,
-                                      axis_label='X',
-                                      anchors=['center', 'middle'],
-                                      tick_label_margin=tick_label_margin * data_shape[2],
-                                      axis_label_margin=axis_label_margin * data_shape[2],
-                                      **kwargs)
+        # --- Orientation triad ------------------------------------------------
+        triad_pos, triad_col = self._triad_segments()
+        self.triad = scene.visuals.Line(pos=triad_pos, color=triad_col,
+                                        connect='segments', width=4,
+                                        method='gl', parent=scene_parent)
 
-        self.yax = scene.visuals.Axis(pos=[[0, 0],
-                                           [0, data_shape[1]]],
-                                      tick_direction=(1, 0),
-                                      parent=parent,
-                                      axis_label='Y',
-                                      anchors=['center', 'middle'],
-                                      tick_label_margin=-tick_label_margin * data_shape[1],
-                                      axis_label_margin=-axis_label_margin * data_shape[1],
-                                      **kwargs)
+        self.labels = scene.visuals.Text(text=self._names,
+                                         pos=self._label_positions(),
+                                         color=self._text_color,
+                                         font_size=font_size, bold=True,
+                                         parent=scene_parent)
 
-        self.zax = scene.visuals.Axis(pos=[[0, 0],
-                                           [0, data_shape[0]]],
-                                      tick_direction=(-1, 0),
-                                      parent=parent,
-                                      axis_label='Z',
-                                      tick_label_margin=tick_label_margin * data_shape[0],
-                                      axis_label_margin=axis_label_margin * data_shape[0],
-                                      anchors=['center', 'middle'], **kwargs)
+        self.transform = transform
 
-        self.xtr = STTransform()
-        self.xtr = self.xtr.as_matrix()
-        self.xtr.rotate(45, (1, 0, 0))
-        self.xtr.translate((0, -1.02, -1.02))
+    # -- geometry ----------------------------------------------------------
+    def _corner(self):
+        """Near/min corner of the cube (data coordinates)."""
+        return np.array([-0.5, -0.5, -0.5])
 
-        self.ytr = STTransform()
-        self.ytr = self.ytr.as_matrix()
-        self.ytr.rotate(135, (0, 1, 0))
-        self.ytr.translate((1.02, 0, 1.02))
+    def _arm(self):
+        """Triad arm length: a fraction of the largest cube extent."""
+        return 0.30 * max(self._ext)
 
-        self.ztr = STTransform()
-        self.ztr = self.ztr.as_matrix()
-        self.ztr.rotate(45, (0, 1, 0))
-        self.ztr.rotate(90, (1, 0, 0))
-        self.ztr.translate((-1.02, -1.02, 0.))
+    def _triad_segments(self):
+        c = self._corner()
+        arm = self._arm()
+        dirs = np.eye(3) * arm
+        pos = np.empty((6, 3), np.float32)
+        col = np.empty((6, 4), np.float32)
+        for i in range(3):
+            pos[2 * i] = c
+            pos[2 * i + 1] = c + dirs[i]
+            col[2 * i] = col[2 * i + 1] = TRIAD_COLORS[i]
+        return pos, col
 
-        self.xax.transform = ChainTransform(transform, self.xtr)
-        self.yax.transform = ChainTransform(transform, self.ytr)
-        self.zax.transform = ChainTransform(transform, self.ztr)
+    def _label_positions(self):
+        c = self._corner()
+        arm = self._arm()
+        return np.array([c + [arm * 1.25, 0, 0],
+                         c + [0, arm * 1.25, 0],
+                         c + [0, 0, arm * 1.25]], np.float32)
 
+    # -- public API (kept compatible with shwirl.shwirl usage) -------------
     @property
     def transform(self):
         return self.axis.transform
 
     @transform.setter
     def transform(self, transform):
-        self.axis.transform = transform
-        self.xax.transform = ChainTransform(transform, self.xtr)
-        self.yax.transform = ChainTransform(transform, self.ytr)
-        self.zax.transform = ChainTransform(transform, self.ztr)
+        for v in (self.axis, self.triad, self.labels):
+            v.transform = transform
+
+    def _set_name(self, index, value):
+        self._names[index] = str(value)
+        self.labels.text = self._names
+
+    @property
+    def xlabel(self):
+        return self._names[0]
+
+    @xlabel.setter
+    def xlabel(self, value):
+        self._set_name(0, value)
+
+    @property
+    def ylabel(self):
+        return self._names[1]
+
+    @ylabel.setter
+    def ylabel(self, value):
+        self._set_name(1, value)
+
+    @property
+    def zlabel(self):
+        return self._names[2]
+
+    @zlabel.setter
+    def zlabel(self, value):
+        self._set_name(2, value)
+
+    # Numeric ranges are shown by the screen-fixed info panel, so the lim
+    # setters are accepted for API compatibility but intentionally inert.
+    @property
+    def xlim(self):
+        return None
+
+    @xlim.setter
+    def xlim(self, value):
+        pass
+
+    @property
+    def ylim(self):
+        return None
+
+    @ylim.setter
+    def ylim(self, value):
+        pass
+
+    @property
+    def zlim(self):
+        return None
+
+    @zlim.setter
+    def zlim(self, value):
+        pass
 
     @property
     def tick_color(self):
-        return self.xax.tick_color
+        return self._axis_color
 
     @tick_color.setter
     def tick_color(self, value):
-        self.xax.tick_color = value
-        self.yax.tick_color = value
-        self.zax.tick_color = value
+        # No separate tick visuals any more; kept for API compatibility.
+        pass
 
     @property
     def label_color(self):
-        return self._label_color
+        return self._text_color
 
     @label_color.setter
     def label_color(self, value):
-        self.xax.label_color = value
-        self.yax.label_color = value
-        self.zax.label_color = value
+        self._text_color = value
+        self.labels.color = value
 
     @property
     def axis_color(self):
@@ -112,75 +178,8 @@ class AxesVisual3D:
 
     @axis_color.setter
     def axis_color(self, value):
+        self._axis_color = value
         self.axis.color = value
-
-    @property
-    def tick_font_size(self):
-        return self.xax.tick_font_size
-
-    @tick_font_size.setter
-    def tick_font_size(self, value):
-        self.xax.tick_font_size = value
-        self.yax.tick_font_size = value
-        self.zax.tick_font_size = value
-
-    @property
-    def axis_font_size(self):
-        return self.xax.axis_font_size
-
-    @axis_font_size.setter
-    def axis_font_size(self, value):
-        self.xax.axis_font_size = value
-        self.yax.axis_font_size = value
-        self.zax.axis_font_size = value
-
-    @property
-    def xlabel(self):
-        return self.xax.axis_label
-
-    @xlabel.setter
-    def xlabel(self, value):
-        self.xax.axis_label = value
-
-    @property
-    def ylabel(self):
-        return self.yax.axis_label
-
-    @ylabel.setter
-    def ylabel(self, value):
-        self.yax.axis_label = value
-
-    @property
-    def zlabel(self):
-        return self.zax.axis_label
-
-    @zlabel.setter
-    def zlabel(self, value):
-        self.zax.axis_label = value
-
-    @property
-    def xlim(self):
-        return self.xax.domain
-
-    @xlim.setter
-    def xlim(self, value):
-        self.xax.domain = value
-
-    @property
-    def ylim(self):
-        return self.yax.domain
-
-    @ylim.setter
-    def ylim(self, value):
-        self.yax.domain = value
-
-    @property
-    def zlim(self):
-        return self.zax.domain
-
-    @zlim.setter
-    def zlim(self, value):
-        self.zax.domain = value
 
     @property
     def parent(self):
@@ -188,10 +187,8 @@ class AxesVisual3D:
 
     @parent.setter
     def parent(self, value):
-        self.axis.parent = value
-        self.xax.parent = value
-        self.yax.parent = value
-        self.zax.parent = value
+        for v in (self.axis, self.triad, self.labels):
+            v.parent = value
 
     def create_cube(self, shape):
         """ Generate vertices & indices for a filled and outlined cube
