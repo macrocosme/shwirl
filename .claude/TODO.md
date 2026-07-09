@@ -4,6 +4,11 @@ Future work / deferred items. Newest context at top.
 
 ## New items (2026-07-08)
 
+- [ ] **On merge of `macrocosme/modernize` → master:** drop `?branch=macrocosme/modernize`
+      from the README CI badge (so it tracks master).
+- [ ] **Docs badge shows *failing*:** readthedocs build is stale/broken (pre-modernization
+      Sphinx setup) — folds into the existing docs-refresh item; badge will flip once fixed.
+
 - [ ] **Multi-channel voxel colouring (RGB composite).** New shader mode colouring
       voxels by 3-channel data (e.g. three co-registered cubes → RGB): needs an
       RGB 3D texture + frag branch in `render_volume.py` (current texture is
