@@ -1317,10 +1317,13 @@ class RenderVolumeVisual(Visual):
         else:
             self._color_scale = int(color_scale)
 
-        if 'u_color_scale' in self.shared_program:
-            self.shared_program['u_color_scale'] = int(self._color_scale)
-            self.shared_program['u_scale_softening'] = float(self._scale_softening)
-            self.shared_program['u_scale_power'] = float(self._scale_power)
+        # Unlike u_threshold, these uniforms exist in every shader (declared in
+        # the shared FRAG_SHADER), so set them unconditionally -- guarding on
+        # membership skips them before the first compile, leaving the first
+        # frame with an undefined stretch.
+        self.shared_program['u_color_scale'] = int(self._color_scale)
+        self.shared_program['u_scale_softening'] = float(self._scale_softening)
+        self.shared_program['u_scale_power'] = float(self._scale_power)
         self.update()
 
     @property

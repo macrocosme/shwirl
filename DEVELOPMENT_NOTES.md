@@ -118,7 +118,35 @@ Pure, unit-tested numeric/label helpers used by both the colorbar and axes:
 - Status: **ruff clean; 45 headless tests pass; opt-in GL render test passes**
   (`SHWIRL_GL_TESTS=1`).
 
-## 8. Housekeeping
+## 8. Python API + Jupyter integration  *(new `shwirl/api.py`, added after commit af0bb67)*
+
+The renderer is now scriptable — the same GLSL transfer functions, without the GUI:
+
+- **`Renderer(source)`** — accepts a FITS path (plain/.gz, via `fits_loader`), a 3D
+  numpy array (z, y, x), or a `LoadedCube`. Offscreen vispy canvas (Qt backend
+  pinned — in a Jupyter kernel vispy would auto-pick jupyter_rfb), same data prep
+  as the GUI.
+- Properties: `method`, `stretch`, `cmap`, `color_method`, `threshold`,
+  `density_factor`; read-only `clim`, `axis_info`.
+- **`render(azimuth, elevation, distance, fov, size)`** → (H, W, 4) uint8 (HiDPI:
+  physical pixels); **`save()`** PNG; **`save_movie()`** 360° fly-around GIF
+  (imageio) or MP4 (imageio-ffmpeg).
+- **`widget()`** — ipywidgets panel (dropdowns + sliders, inline re-render);
+  **`canvas()`** — live mouse-rotatable canvas via optional `jupyter_rfb`.
+- `demo_cube()` — synthetic multi-blob spectral cube for examples/tests.
+- Lazy exports: `from shwirl import Renderer, demo_cube` (no Qt cost at import).
+- New extra: `pip install shwirl[notebook]` (ipywidgets, imageio).
+- **`examples/shwirl_api_demo.ipynb`** — executed end-to-end on live GL: first
+  render, transfer-function + stretch comparisons, Moment-1, PNG/GIF export,
+  widget, own-FITS instructions. Outputs embedded (JPEG stills; ~1.2 MB file).
+- Bug found & fixed en route: the `color_scale` uniform setter was guarded by
+  membership (`'u_color_scale' in shared_program`) which is False before first
+  compile → first frame rendered with an undefined stretch. Now set
+  unconditionally (the uniforms exist in every shader).
+- Tests: `shwirl/tests/test_api.py` — validation always-on; render/save/movie
+  GL-gated (`SHWIRL_GL_TESTS=1`). Suite: 56 passed with GL.
+
+## 9. Housekeeping
 
 - Diagnosed the SAMI test cube failure: the downloaded file is a 339-byte **HTML
   page**, not FITS (re-download needed) — recorded in `.claude/TODO.md`, not "fixed".
@@ -135,8 +163,10 @@ Pure, unit-tested numeric/label helpers used by both the colorbar and axes:
 **New**
 - `shwirl/fits_loader.py` (223 lines)
 - `shwirl/labels.py` (97)
+- `shwirl/api.py` (~360) + `examples/shwirl_api_demo.ipynb` (post-af0bb67)
 - `shwirl/tests/test_file_loading.py` (198)
 - `shwirl/tests/test_labels.py` (74)
+- `shwirl/tests/test_api.py` (post-af0bb67)
 - `.claude/TODO.md`, `DEVELOPMENT_NOTES.md` (this file)
 
 **Modified**

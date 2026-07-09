@@ -59,6 +59,17 @@ Almost all real logic lives in **three files**.
   lives in the left column but is created with vispy orientation `'right'` so its label/ticks
   face the canvas *interior* (otherwise `'left'` pushes them off the canvas edge); `ColorBarVisual.text_padding_factor` is bumped so the rotated title clears the bar.
 - `shwirl/shaders/edge_valley.glsl` — standalone GLSL snippet.
+- `shwirl/api.py` — **scriptable, GUI-free Python API**: `Renderer` (offscreen render →
+  numpy image / `save()` PNG / `save_movie()` GIF+MP4 fly-arounds / `widget()` ipywidgets
+  panel / `canvas()` live jupyter_rfb view) + `demo_cube()` synthetic data. Lazy top-level
+  exports via `shwirl.__getattr__` (`from shwirl import Renderer, demo_cube`). Accepts FITS
+  paths (via `fits_loader`), 3D arrays, or `LoadedCube`s; same data prep as the GUI. Gotchas
+  learned: must pin `app="pyside6"` on the offscreen `SceneCanvas` (in a Jupyter kernel vispy
+  auto-picks jupyter_rfb), and must call `camera.set_range()` after adding the volume (else
+  the default camera is zoomed into a corner → flat-plane renders). `canvas().render()`
+  returns physical (HiDPI-scaled) pixels. Extra: `pip install shwirl[notebook]`
+  (ipywidgets+imageio); `imageio-ffmpeg` for MP4; `jupyter_rfb` for live canvas. Example:
+  `examples/shwirl_api_demo.ipynb` (executed outputs embedded; rebuild by re-running it).
 
 Data flow: `MainWindow` builds a VisPy `SceneCanvas`, instantiates `RenderVolume` with the loaded cube, and GUI controls push parameters (colormap, thresholds, transfer-function selection, moments) into the shader uniforms, which re-render on the GPU.
 

@@ -4,6 +4,13 @@ Future work / deferred items. Newest context at top.
 
 ## New items (2026-07-08)
 
+- [x] **Python API + Jupyter integration** — done (`shwirl/api.py`, `[notebook]`
+      extra, `examples/shwirl_api_demo.ipynb`). Follow-ups:
+      - [ ] README + PyPI blurb showcasing the API (screenshot/GIF from the notebook)
+      - [ ] Sphinx/API docs page for `shwirl.api`
+      - [ ] SoFiA mask/catalog overlay (natural next step on top of the API)
+      - [ ] Verify `canvas()` live path with jupyter_rfb actually installed
+
 - [ ] **At release time: convert `DEVELOPMENT_NOTES.md` → `CHANGELOG.md`.** Adopt
       Keep a Changelog format (`[Unreleased]` → versioned section on tag, with
       Added/Changed/Fixed); keep it terse/user-facing (the narrative "why" can go in

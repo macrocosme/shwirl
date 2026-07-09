@@ -38,6 +38,10 @@ dependencies = [
 # deprecated pkg_resources, which was removed from setuptools 81+, so pin
 # setuptools to a version that still provides it.
 filterbank = ["blimpy", "setuptools<81"]
+# Notebook/scripting niceties for the Python API (shwirl.api): interactive
+# widget + GIF movie export. Optional on top of these: `imageio-ffmpeg` for
+# MP4 output and `jupyter_rfb` for the live in-notebook canvas.
+notebook = ["ipywidgets", "imageio"]
 dev = ["pytest", "pytest-cov", "ruff"]
 
 [project.urls]
